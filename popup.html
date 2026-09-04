@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>QR Code Editor</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header class="header">
+      <div class="brand">
+        <div class="brand-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="7" height="7"></rect>
+            <rect x="14" y="3" width="7" height="7"></rect>
+            <rect x="14" y="14" width="7" height="7"></rect>
+            <rect x="3" y="14" width="7" height="7"></rect>
+            <line x1="7" y1="7" x2="7.01" y2="7"></line>
+            <line x1="17" y1="7" x2="17.01" y2="7"></line>
+            <line x1="7" y1="17" x2="7.01" y2="17"></line>
+          </svg>
+        </div>
+        <div>
+          <h1 class="title">QR EDITOR</h1>
+          <p class="subtitle">Scan • Edit • Replace QR Codes</p>
+        </div>
+      </div>
+      <button id="btnOpenEditorTab" class="icon-btn" title="Open Full Screen Editor">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+          <polyline points="15 3 21 3 21 9"></polyline>
+          <line x1="10" y1="14" x2="21" y2="3"></line>
+        </svg>
+        <span>Full Editor</span>
+      </button>
+    </header>
+
+    <!-- Status Bar -->
+    <div class="status-bar" id="statusBar">
+      <span class="status-dot"></span>
+      <span class="status-text" id="statusText">READY</span>
+    </div>
+
+    <!-- Drop Zone / Upload Area -->
+    <div class="drop-zone" id="dropZone">
+      <input type="file" id="fileInput" accept="image/jpeg,image/png,image/webp,image/jpg,application/pdf,.pdf" class="file-input-hidden">
+      <div class="drop-zone-prompt" id="dropPrompt">
+        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="1.8">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+          <polyline points="17 8 12 3 7 8"></polyline>
+          <line x1="12" y1="3" x2="12" y2="15"></line>
+        </svg>
+        <p class="drop-main-text">Drop an image or PDF here or click to choose</p>
+        <p class="drop-sub-text">Supported formats: JPG • JPEG • PNG • WEBP • PDF</p>
+        <button type="button" class="btn btn-secondary btn-sm" id="btnChooseFile">Choose File</button>
+      </div>
+
+      <!-- Image / PDF Info & Preview Container -->
+      <div class="image-preview-container" id="previewContainer" style="display: none;">
+        <div class="file-meta" id="fileMeta">
+          <span class="file-meta-name" id="metaFilename">file.png</span>
+          <span class="file-meta-badge" id="metaDimensions">0 × 0 px</span>
+          <span class="file-meta-badge" id="metaSize">0 KB</span>
+        </div>
+
+        <!-- PDF Multi-Page Bar -->
+        <div class="pdf-page-bar" id="pdfPageBar" style="display: none;">
+          <button type="button" id="btnPdfPrev" class="page-nav-btn">&larr;</button>
+          <span id="pdfPageIndicator" class="page-indicator">Page 1 of 1</span>
+          <button type="button" id="btnPdfNext" class="page-nav-btn">&rarr;</button>
+        </div>
+
+        <div class="canvas-wrapper" id="canvasWrapper">
+          <canvas id="previewCanvas"></canvas>
+          <div class="overlay-box" id="qrOverlayBox" style="display: none;"></div>
+        </div>
+
+        <div class="action-row">
+          <button id="btnScan" class="btn btn-primary">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="11" cy="11" r="8"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+            Scan QR
+          </button>
+          <button id="btnClear" class="btn btn-secondary">Clear</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Detection Result Panel -->
+    <div class="card result-card" id="resultCard" style="display: none;">
+      <div class="card-header">
+        <div class="badge-group">
+          <span class="badge badge-success" id="detectedBadge">QR CODE DETECTED ✓</span>
+          <span class="badge badge-type" id="typeBadge">URL</span>
+        </div>
+        <span class="qr-count-label" id="qrCountLabel">QR #1</span>
+      </div>
+
+      <!-- Multiple QR Selector (visible if > 1 QR found) -->
+      <div class="qr-selector" id="qrSelector" style="display: none;"></div>
+
+      <div class="data-group">
+        <label for="decodedDataText" class="section-label">Decoded Data</label>
+        <textarea id="decodedDataText" class="data-textarea" readonly rows="3" spellcheck="false"></textarea>
+      </div>
+
+      <div class="btn-group-row">
+        <button id="btnOpenUrl" class="btn btn-action" style="display: none;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+            <polyline points="15 3 21 3 21 9"></polyline>
+            <line x1="10" y1="14" x2="21" y2="3"></line>
+          </svg>
+          Open URL
+        </button>
+        <button id="btnCopyData" class="btn btn-action">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+          </svg>
+          Copy
+        </button>
+        <button id="btnToggleEdit" class="btn btn-action">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+          </svg>
+          Edit
+        </button>
+      </div>
+    </div>
+
+    <!-- Edit & Generate Panel -->
+    <div class="card edit-card" id="editCard" style="display: none;">
+      <div class="card-header">
+        <span class="card-title">EDIT QR DATA</span>
+        <span class="badge badge-info">Raw Mode</span>
+      </div>
+      <textarea id="editDataText" class="data-textarea editable" rows="3" placeholder="Enter new QR content..." spellcheck="false"></textarea>
+      
+      <div class="btn-group-row">
+        <button id="btnGenerateQR" class="btn btn-primary">Generate New QR</button>
+        <button id="btnCancelEdit" class="btn btn-secondary">Cancel</button>
+      </div>
+    </div>
+
+    <!-- Verification & Side-by-Side Thumbnail Preview -->
+    <div class="card preview-card" id="qrPreviewCard" style="display: none;">
+      <div class="verification-status" id="verificationStatus">
+        <span class="status-icon">✓</span>
+        <span id="verificationText">New QR verified ✓</span>
+      </div>
+
+      <div class="qr-compare-row">
+        <div class="qr-compare-box">
+          <span class="compare-title">OLD QR</span>
+          <div class="compare-thumb" id="oldQrThumb"></div>
+        </div>
+        <div class="qr-compare-box">
+          <span class="compare-title">NEW QR</span>
+          <div class="compare-thumb" id="newQrThumb"></div>
+        </div>
+      </div>
+
+      <div class="btn-group-row">
+        <button id="btnApplyReplacement" class="btn btn-success">Apply Replacement</button>
+      </div>
+    </div>
+
+    <!-- Final Replacement & Download Panel -->
+    <div class="card success-card" id="successCard" style="display: none;">
+      <div class="success-banner">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.5">
+          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+          <polyline points="22 4 12 14.01 9 11.01"></polyline>
+        </svg>
+        <span>QR REPLACED SUCCESSFULLY ✓</span>
+      </div>
+      <p class="resolution-note" id="resolutionNote">Original resolution (0 × 0) preserved.</p>
+
+      <div class="btn-group-row">
+        <button id="btnDownloadDefault" class="btn btn-primary">Download Image</button>
+        <button id="btnDownloadAlt" class="btn btn-secondary">Download as PNG</button>
+        <button id="btnStartNew" class="btn btn-secondary">Start New</button>
+      </div>
+    </div>
+
+    <!-- Error Alert Banner -->
+    <div class="error-banner" id="errorBanner" style="display: none;">
+      <span id="errorMessage">An error occurred</span>
+      <button id="btnDismissError" class="dismiss-btn">&times;</button>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="lib/jsQR.js"></script>
+  <script src="lib/qrcode.js"></script>
+  <script src="lib/pdf.min.js"></script>
+  <script src="lib/pdf-lib.min.js"></script>
+  <script src="scanner/qr-scanner.js"></script>
+  <script src="scanner/qr-generator.js"></script>
+  <script src="scanner/pdf-processor.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>

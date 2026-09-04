@@ -1,0 +1,23 @@
+{
+  "manifest_version": 3,
+  "name": "QR Code Scanner, Editor & Replacer",
+  "version": "1.0.0",
+  "description": "Scan, decode, edit, regenerate, and seamlessly replace QR codes inside images directly in your browser.",
+  "icons": {
+    "16": "assets/icon16.png",
+    "48": "assets/icon48.png",
+    "128": "assets/icon128.png"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "QR Code Editor",
+    "default_icon": {
+      "16": "assets/icon16.png",
+      "48": "assets/icon48.png",
+      "128": "assets/icon128.png"
+    }
+  },
+  "permissions": [
+    "storage"
+  ]
+}

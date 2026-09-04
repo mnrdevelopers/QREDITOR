@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>QR Code Editor & Replacer - Workspace</title>
+  <link rel="stylesheet" href="editor.css">
+</head>
+<body>
+  <div class="editor-layout">
+    <!-- Top Navigation Bar -->
+    <header class="top-nav">
+      <div class="nav-left">
+        <div class="app-logo">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="3" width="7" height="7"></rect>
+            <rect x="14" y="3" width="7" height="7"></rect>
+            <rect x="14" y="14" width="7" height="7"></rect>
+            <rect x="3" y="14" width="7" height="7"></rect>
+            <line x1="7" y1="7" x2="7.01" y2="7"></line>
+            <line x1="17" y1="7" x2="17.01" y2="7"></line>
+            <line x1="7" y1="17" x2="7.01" y2="17"></line>
+          </svg>
+        </div>
+        <div class="app-titles">
+          <h1 class="main-title">QR Code Editor & Replacer</h1>
+          <span class="sub-badge">Client-Side Engine • V1</span>
+        </div>
+      </div>
+
+      <div class="nav-center">
+        <div class="status-indicator" id="statusBar">
+          <span class="status-dot"></span>
+          <span class="status-label" id="statusLabel">READY</span>
+        </div>
+      </div>
+
+      <div class="nav-right">
+        <button id="btnNewImage" class="btn btn-outline">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="17 8 12 3 7 8"></polyline>
+            <line x1="12" y1="3" x2="12" y2="15"></line>
+          </svg>
+          Open New File
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Workspace Container -->
+    <div class="workspace-body">
+      <!-- Left: Interactive Canvas & Comparison Viewport -->
+      <main class="canvas-viewport" id="viewport">
+        <!-- Viewport Controls Toolbar -->
+        <div class="viewport-toolbar" id="viewportToolbar" style="display: none;">
+          <div class="tool-group">
+            <button id="btnZoomOut" class="tool-btn" title="Zoom Out">−</button>
+            <span id="zoomLevelText" class="zoom-label">100%</span>
+            <button id="btnZoomIn" class="tool-btn" title="Zoom In">+</button>
+            <button id="btnZoomFit" class="tool-btn" title="Fit to Screen">Fit</button>
+          </div>
+
+          <div class="tool-divider"></div>
+
+          <!-- PDF Multi-Page Controls -->
+          <div class="tool-group" id="pdfToolbarControls" style="display: none;">
+            <button id="btnPdfPrev" class="tool-btn" title="Previous Page">&larr; Prev Page</button>
+            <span id="pdfPageIndicator" class="zoom-label">Page 1 of 1</span>
+            <button id="btnPdfNext" class="tool-btn" title="Next Page">Next Page &rarr;</button>
+          </div>
+
+          <div class="tool-divider" id="pdfToolbarDivider" style="display: none;"></div>
+
+          <div class="tool-group">
+            <button id="btnSelectArea" class="tool-btn" title="Drag a box over a small QR code to scan with 3x zoom">🔍 Scan Selected Area</button>
+          </div>
+
+          <div class="tool-divider"></div>
+
+          <div class="tool-group" id="compareControls" style="display: none;">
+            <button id="btnToggleCompare" class="tool-btn active-tab" data-mode="result">Modified View</button>
+            <button id="btnViewOriginal" class="tool-btn" data-mode="original">Original View</button>
+            <button id="btnSideBySide" class="tool-btn" data-mode="split">Side-by-Side</button>
+          </div>
+        </div>
+
+        <!-- Initial Drag/Drop Overlay when no image loaded -->
+        <div class="empty-state" id="emptyState">
+          <input type="file" id="fileInput" accept="image/jpeg,image/png,image/webp,image/jpg,application/pdf,.pdf" style="display: none;">
+          <div class="empty-dropzone" id="emptyDropzone">
+            <div class="drop-icon-ring">
+              <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="#4f46e5" stroke-width="1.8">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                <polyline points="21 15 16 10 5 21"></polyline>
+              </svg>
+            </div>
+            <h2>Drag & Drop an image or PDF here</h2>
+            <p>Supports high-resolution JPG, JPEG, PNG, WEBP, and multi-page PDF documents</p>
+            <button id="btnBrowseFile" class="btn btn-primary btn-lg">Choose File</button>
+            <span class="security-note">🔒 100% local in-browser processing. Zero data uploaded.</span>
+          </div>
+        </div>
+
+        <!-- Single Canvas Mode -->
+        <div class="canvas-stage" id="canvasStage" style="display: none;">
+          <div class="canvas-container" id="canvasContainer">
+            <canvas id="mainCanvas"></canvas>
+            <div class="bounding-box-overlay" id="bboxOverlay" style="display: none;">
+              <span class="bbox-tag" id="bboxTag">QR #1</span>
+            </div>
+            <div class="selection-rect" id="selectionRect" style="display: none;"></div>
+          </div>
+        </div>
+
+        <!-- Side-by-Side Comparison Container -->
+        <div class="split-stage" id="splitStage" style="display: none;">
+          <div class="split-pane">
+            <div class="pane-header">ORIGINAL</div>
+            <div class="pane-content">
+              <canvas id="origSplitCanvas"></canvas>
+            </div>
+          </div>
+          <div class="split-divider"></div>
+          <div class="split-pane">
+            <div class="pane-header">PREVIEW WITH NEW QR</div>
+            <div class="pane-content">
+              <canvas id="newSplitCanvas"></canvas>
+            </div>
+          </div>
+        </div>
+      </main>
+
+      <!-- Right: Control Sidebar -->
+      <aside class="sidebar" id="sidebar">
+        <!-- Panel 1: Image Information -->
+        <section class="side-panel" id="panelMeta" style="display: none;">
+          <div class="panel-header">
+            <span class="panel-title">IMAGE DETAILS</span>
+            <span class="panel-pill" id="fileFormatPill">PNG</span>
+          </div>
+          <div class="meta-grid">
+            <div class="meta-item">
+              <span class="meta-label">File Name</span>
+              <span class="meta-val" id="valFilename">-</span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-label">Native Dimensions</span>
+              <span class="meta-val highlight" id="valDimensions">-</span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-label">File Size</span>
+              <span class="meta-val" id="valSize">-</span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-label">Status</span>
+              <span class="meta-val" id="valStatus">Ready to scan</span>
+            </div>
+          </div>
+          <button id="btnScanImage" class="btn btn-primary btn-block">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="11" cy="11" r="8"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+            Scan for QR Codes
+          </button>
+          <button id="btnDeepScan" class="btn btn-secondary btn-block">
+            🔍 Deep Scan (Small / Faint QR)
+          </button>
+        </section>
+
+        <!-- Panel 2: Detected QR Code Details -->
+        <section class="side-panel" id="panelDetection" style="display: none;">
+          <div class="panel-header">
+            <span class="panel-title">DETECTED QR CODE</span>
+            <span class="badge badge-type" id="detTypeBadge">URL</span>
+          </div>
+
+          <!-- Multi-QR Selector Tabs -->
+          <div class="qr-tab-strip" id="qrTabs" style="display: none;"></div>
+
+          <div class="qr-metrics-row">
+            <span class="metric-text" id="metricCoords">Pos: (0, 0)</span>
+            <span class="metric-text" id="metricSize">Size: 0 × 0 px</span>
+          </div>
+
+          <div class="field-block">
+            <label class="field-label" for="decodedText">Decoded Content</label>
+            <textarea id="decodedText" class="code-textarea" readonly rows="4" spellcheck="false"></textarea>
+          </div>
+
+          <div class="btn-row">
+            <button id="btnOpenUrl" class="btn btn-secondary" style="display: none;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                <polyline points="15 3 21 3 21 9"></polyline>
+                <line x1="10" y1="14" x2="21" y2="3"></line>
+              </svg>
+              Open URL
+            </button>
+            <button id="btnCopyData" class="btn btn-secondary">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+              </svg>
+              Copy
+            </button>
+            <button id="btnStartEdit" class="btn btn-primary">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+              </svg>
+              Edit Data
+            </button>
+          </div>
+        </section>
+
+        <!-- Panel 3: QR Editing & Regeneration -->
+        <section class="side-panel" id="panelEdit" style="display: none;">
+          <div class="panel-header">
+            <span class="panel-title">EDIT & REGENERATE QR</span>
+            <span class="panel-pill">Raw Text Mode</span>
+          </div>
+
+          <div class="field-block">
+            <label class="field-label" for="editText">New QR Data</label>
+            <textarea id="editText" class="code-textarea editable" rows="4" placeholder="Modify QR content..." spellcheck="false"></textarea>
+          </div>
+
+          <!-- Fine-tuning options -->
+          <details class="fine-tuning-accordion">
+            <summary class="accordion-summary">Advanced Settings (Padding, Error Correction)</summary>
+            <div class="accordion-content">
+              <div class="setting-row">
+                <label for="settingPadding" class="setting-label">Replacement Mask Padding:</label>
+                <div class="slider-val-group">
+                  <input type="range" id="settingPadding" min="0" max="12" value="3" step="1">
+                  <span id="valPaddingText">3px</span>
+                </div>
+              </div>
+              <div class="setting-row">
+                <label for="settingEC" class="setting-label">Error Correction Level:</label>
+                <select id="settingEC" class="setting-select">
+                  <option value="L">L — 7% recovery</option>
+                  <option value="M" selected>M — 15% recovery (Standard)</option>
+                  <option value="Q">Q — 25% recovery (High)</option>
+                  <option value="H">H — 30% recovery (Best)</option>
+                </select>
+              </div>
+            </div>
+          </details>
+
+          <button id="btnGenerate" class="btn btn-primary btn-block">Generate New QR</button>
+
+          <!-- Verification Banner & Side-by-side Thumbnails -->
+          <div class="verification-box" id="verificationBox" style="display: none;">
+            <div class="verify-badge" id="verifyBadge">
+              <span class="badge-icon" id="verifyBadgeIcon">✓</span>
+              <span id="verifyBadgeText">New QR verified ✓</span>
+            </div>
+
+            <div class="qr-thumbnail-comparison">
+              <div class="qr-thumb-box">
+                <span class="thumb-lbl">ORIGINAL QR</span>
+                <div class="thumb-frame" id="oldQrFrame"></div>
+              </div>
+              <div class="qr-thumb-box">
+                <span class="thumb-lbl">GENERATED QR</span>
+                <div class="thumb-frame" id="newQrFrame"></div>
+              </div>
+            </div>
+
+            <button id="btnApply" class="btn btn-success btn-block">Apply Replacement</button>
+            <button id="btnCancelEdit" class="btn btn-secondary btn-block">Cancel Edit</button>
+          </div>
+        </section>
+
+        <!-- Panel 4: Success & Export -->
+        <section class="side-panel" id="panelExport" style="display: none;">
+          <div class="panel-header">
+            <span class="panel-title">REPLACEMENT COMPLETE</span>
+            <span class="badge badge-success">READY TO EXPORT</span>
+          </div>
+
+          <div class="success-callout">
+            <div class="callout-icon">✓</div>
+            <div>
+              <div class="callout-title">QR Successfully Replaced</div>
+              <div class="callout-desc" id="calloutResolution">Original 0 × 0 px resolution preserved.</div>
+            </div>
+          </div>
+
+          <div class="export-actions">
+            <button id="btnDownloadDefault" class="btn btn-primary btn-block">Download Image</button>
+            <button id="btnDownloadAlt" class="btn btn-secondary btn-block">Download as Alternate Format</button>
+            <button id="btnStartOver" class="btn btn-outline btn-block">Process Another Image</button>
+          </div>
+        </section>
+
+        <!-- Error Banner -->
+        <div class="error-box" id="errorBox" style="display: none;">
+          <span class="error-text" id="errorText">Error description</span>
+          <button id="btnDismissError" class="btn-dismiss">&times;</button>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <!-- Local Standalone Libraries -->
+  <script src="lib/jsQR.js"></script>
+  <script src="lib/qrcode.js"></script>
+  <script src="lib/pdf.min.js"></script>
+  <script src="lib/pdf-lib.min.js"></script>
+  <script src="scanner/qr-scanner.js"></script>
+  <script src="scanner/qr-generator.js"></script>
+  <script src="scanner/pdf-processor.js"></script>
+  <script src="editor.js"></script>
+</body>
+</html>
