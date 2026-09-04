@@ -53,14 +53,6 @@
       <main class="canvas-viewport" id="viewport">
         <!-- Viewport Controls Toolbar -->
         <div class="viewport-toolbar" id="viewportToolbar" style="display: none;">
-          <!-- Editor Mode Toggle -->
-          <div class="tool-group" id="editorModeGroup">
-            <button id="btnModeQR" class="tool-btn active-tab">🔳 QR Editor</button>
-            <button id="btnModeText" class="tool-btn">✏️ PDF Text Editor</button>
-          </div>
-
-          <div class="tool-divider"></div>
-
           <div class="tool-group">
             <button id="btnZoomOut" class="tool-btn" title="Zoom Out">−</button>
             <span id="zoomLevelText" class="zoom-label">100%</span>
@@ -79,11 +71,11 @@
 
           <div class="tool-divider" id="pdfToolbarDivider" style="display: none;"></div>
 
-          <div class="tool-group" id="qrToolGroup">
+          <div class="tool-group">
             <button id="btnSelectArea" class="tool-btn" title="Drag a box over a small QR code to scan with 3x zoom">🔍 Scan Selected Area</button>
           </div>
 
-          <div class="tool-divider" id="compareDivider"></div>
+          <div class="tool-divider"></div>
 
           <div class="tool-group" id="compareControls" style="display: none;">
             <button id="btnToggleCompare" class="tool-btn active-tab" data-mode="result">Modified View</button>
@@ -118,7 +110,6 @@
               <span class="bbox-tag" id="bboxTag">QR #1</span>
             </div>
             <div class="selection-rect" id="selectionRect" style="display: none;"></div>
-            <div class="text-overlay-layer" id="textOverlayLayer" style="display: none;"></div>
           </div>
         </div>
 
@@ -306,64 +297,6 @@
           </div>
         </section>
 
-        <!-- Panel 5: PDF Text Detection & Editing -->
-        <section class="side-panel" id="panelTextEdit" style="display: none;">
-          <div class="panel-header">
-            <span class="panel-title">PDF TEXT EDITOR</span>
-            <span class="badge badge-info" id="textCountBadge">0 Lines Detected</span>
-          </div>
-
-          <p class="section-help-text">Click any highlighted text line on the PDF canvas to edit it.</p>
-
-          <div class="field-block">
-            <label class="field-label" for="selectedTextOriginal">Original Text</label>
-            <textarea id="selectedTextOriginal" class="code-textarea" readonly rows="2" placeholder="Select text on the PDF..."></textarea>
-          </div>
-
-          <div class="field-block">
-            <label class="field-label" for="selectedTextNew">Replacement Text</label>
-            <textarea id="selectedTextNew" class="code-textarea editable" rows="3" placeholder="Type new text here..."></textarea>
-          </div>
-
-          <div class="text-settings-grid">
-            <div class="setting-item">
-              <label class="setting-label" for="textFontFamily">Font</label>
-              <select id="textFontFamily" class="setting-select">
-                <option value="Helvetica" selected>Helvetica (Standard)</option>
-                <option value="TimesRoman">Times Roman</option>
-                <option value="Courier">Courier (Monospace)</option>
-              </select>
-            </div>
-
-            <div class="setting-item">
-              <label class="setting-label" for="textFontSize">Size (pt)</label>
-              <input type="number" id="textFontSize" class="setting-number-input" min="6" max="72" value="12">
-            </div>
-
-            <div class="setting-item">
-              <label class="setting-label" for="textColor">Color</label>
-              <input type="color" id="textColor" class="setting-color-input" value="#000000">
-            </div>
-
-            <div class="setting-item">
-              <label class="setting-label" for="textMaskPadding">Padding</label>
-              <input type="number" id="textMaskPadding" class="setting-number-input" min="0" max="10" value="2">
-            </div>
-          </div>
-
-          <div class="btn-row">
-            <button id="btnApplyTextEdit" class="btn btn-success" disabled>Apply Change</button>
-            <button id="btnCancelTextEdit" class="btn btn-secondary">Cancel</button>
-          </div>
-
-          <!-- Active Replacements List on this Page -->
-          <div class="replacements-container" id="replacementsContainer" style="display: none;">
-            <div class="field-label">Modified Text on this Page (<span id="replacementCount">0</span>):</div>
-            <div class="replacements-list" id="replacementsList"></div>
-            <button id="btnDownloadTextPdf" class="btn btn-primary btn-block">Download Modified PDF</button>
-          </div>
-        </section>
-
         <!-- Error Banner -->
         <div class="error-box" id="errorBox" style="display: none;">
           <span class="error-text" id="errorText">Error description</span>
@@ -381,7 +314,6 @@
   <script src="scanner/qr-scanner.js"></script>
   <script src="scanner/qr-generator.js"></script>
   <script src="scanner/pdf-processor.js"></script>
-  <script src="scanner/pdf-text-processor.js"></script>
   <script src="editor.js"></script>
 </body>
 </html>
