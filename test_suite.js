@@ -221,6 +221,50 @@ async function runTests() {
     const oddCrop = { x: -20, y: -50, width: 300, height: 150 };
     const oddResults = await QRScanner.scanRegion(img, oddCrop);
     assert(Array.isArray(oddResults), 'TEST 11b: Region scan handles out-of-bounds cropbox safely without binarizer error');
+
+    // 11c: Tight zero-margin crop selection (user dragged tightly around finder squares with 0 white margin)
+    // In standard jsQR, 0 margin fails finder pattern ratio. With padBufferWithQuietZone, it decodes cleanly!
+    const tightImg = createSyntheticImage('https://tight-crop.net', 400, 400, 50, 50, 3, 0); // margin = 0
+    const tightBox = { x: 50, y: 50, width: tightImg.qrPixelSize, height: tightImg.qrPixelSize };
+    const tightResults = await QRScanner.scanRegion(tightImg, tightBox);
+    assert(tightResults.length === 1 && tightResults[0].data === 'https://tight-crop.net',
+      'TEST 11c: Tight zero-margin crop selection decoded via synthetic quiet zone padding');
+
+    // 11d: Otsu Thresholding algorithm test
+    const grayBuf = new Uint8ClampedArray(100 * 100 * 4);
+    // Fill with simulated anti-aliased transition grays (120, 130, 200)
+    for (let i = 0; i < grayBuf.length; i += 4) {
+      const v = (i % 200 < 100) ? 60 : 210;
+      grayBuf[i] = v; grayBuf[i+1] = v; grayBuf[i+2] = v; grayBuf[i+3] = 255;
+    }
+    const otsuOut = QRScanner.otsuThreshold(grayBuf, 100, 100);
+    const hasBinaryValues = otsuOut.every((val, idx) => (idx % 4 === 3) || val === 0 || val === 255);
+    assert(hasBinaryValues === true, 'TEST 11d: Otsu thresholding cleanly produces pure binary 0/255 modules');
+
+    // 11e: Adaptive Thresholding algorithm test
+    const adaptOut = QRScanner.adaptiveThreshold(grayBuf, 100, 100);
+    assert(adaptOut instanceof Uint8ClampedArray && adaptOut.length === grayBuf.length,
+      'TEST 11e: Bradley-Roth adaptive thresholding processes buffer successfully');
+
+    // 11f: Simulated PDF anti-aliasing / smoothing detection test
+    // Create synthetic QR and blur its modules by averaging adjacent pixels (simulating PDF.js font/vector anti-aliasing)
+    const pdfSimImg = createSyntheticImage('https://pdf-smoothed-qr.io', 500, 500, 60, 60, 3, 4);
+    for (let y = 1; y < 499; y++) {
+      for (let x = 1; x < 499; x++) {
+        const idx = (y * 500 + x) * 4;
+        const left = (y * 500 + (x - 1)) * 4;
+        const right = (y * 500 + (x + 1)) * 4;
+        // Soften edges with 30% gray blur
+        if (pdfSimImg.data[idx] === 0 && (pdfSimImg.data[left] === 255 || pdfSimImg.data[right] === 255)) {
+          pdfSimImg.data[idx] = 110;
+          pdfSimImg.data[idx + 1] = 110;
+          pdfSimImg.data[idx + 2] = 110;
+        }
+      }
+    }
+    const pdfSimDetected = await QRScanner.scanQRCode(pdfSimImg, { deepScan: true });
+    assert(pdfSimDetected.length >= 1 && pdfSimDetected[0].data === 'https://pdf-smoothed-qr.io',
+      'TEST 11f: Anti-aliased/smoothed PDF QR code successfully detected and decoded');
   }
 
   // TEST 12: PDF Support & QR Replacement on PDF

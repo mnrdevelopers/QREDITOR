@@ -184,6 +184,131 @@
     return output;
   }
 
+  /**
+   * Otsu's Global Binarization Thresholding.
+   * Calculates maximum between-class variance to cleanly split foreground modules from background.
+   * Turns faded, anti-aliased, or low-contrast PDF QR modules into crisp binary black and white.
+   */
+  function otsuThreshold(dataArray, width, height) {
+    const len = dataArray.length;
+    const hist = new Int32Array(256);
+    let totalPixels = 0;
+
+    for (let i = 0; i < len; i += 4) {
+      const lum = (dataArray[i] * 0.299 + dataArray[i + 1] * 0.587 + dataArray[i + 2] * 0.114) | 0;
+      hist[lum]++;
+      totalPixels++;
+    }
+
+    let sum = 0;
+    for (let i = 0; i < 256; i++) sum += i * hist[i];
+
+    let sumB = 0;
+    let wB = 0;
+    let maxVar = 0;
+    let threshold = 128;
+
+    for (let t = 0; t < 256; t++) {
+      wB += hist[t];
+      if (wB === 0) continue;
+      const wF = totalPixels - wB;
+      if (wF === 0) break;
+
+      sumB += t * hist[t];
+      const mB = sumB / wB;
+      const mF = (sum - sumB) / wF;
+
+      const betweenVar = wB * wF * (mB - mF) * (mB - mF);
+      if (betweenVar > maxVar) {
+        maxVar = betweenVar;
+        threshold = t;
+      }
+    }
+
+    const output = new Uint8ClampedArray(len);
+    for (let i = 0; i < len; i += 4) {
+      const lum = (dataArray[i] * 0.299 + dataArray[i + 1] * 0.587 + dataArray[i + 2] * 0.114) | 0;
+      const val = lum < threshold ? 0 : 255;
+      output[i]     = val;
+      output[i + 1] = val;
+      output[i + 2] = val;
+      output[i + 3] = 255;
+    }
+    return output;
+  }
+
+  /**
+   * Bradley-Roth Adaptive Thresholding using Integral Images.
+   * Handles uneven backgrounds, shaded PDF panels, colored paper, or localized shadows.
+   */
+  function adaptiveThreshold(dataArray, width, height, deltaPercent = 14) {
+    const len = dataArray.length;
+    const S = Math.max(8, Math.round(width / 12));
+    const s2 = (S / 2) | 0;
+    const T = (100 - deltaPercent) / 100;
+
+    const integral = new Float64Array((width + 1) * (height + 1));
+    const lums = new Uint8Array(width * height);
+
+    for (let y = 0; y < height; y++) {
+      const rowOffset = y * width;
+      let sum = 0;
+      for (let x = 0; x < width; x++) {
+        const idx = (rowOffset + x) * 4;
+        const lum = (dataArray[idx] * 0.299 + dataArray[idx + 1] * 0.587 + dataArray[idx + 2] * 0.114) | 0;
+        lums[rowOffset + x] = lum;
+        sum += lum;
+        integral[(y + 1) * (width + 1) + (x + 1)] = integral[y * (width + 1) + (x + 1)] + sum;
+      }
+    }
+
+    const output = new Uint8ClampedArray(len);
+    for (let y = 0; y < height; y++) {
+      const y1 = Math.max(0, y - s2);
+      const y2 = Math.min(height - 1, y + s2);
+      const rowOffset = y * width;
+
+      for (let x = 0; x < width; x++) {
+        const x1 = Math.max(0, x - s2);
+        const x2 = Math.min(width - 1, x + s2);
+        const count = (x2 - x1 + 1) * (y2 - y1 + 1);
+
+        const sum = integral[(y2 + 1) * (width + 1) + (x2 + 1)]
+                  - integral[(y1) * (width + 1) + (x2 + 1)]
+                  - integral[(y2 + 1) * (width + 1) + (x1)]
+                  + integral[(y1) * (width + 1) + (x1)];
+
+        const lum = lums[rowOffset + x];
+        const val = (lum * count <= sum * T) ? 0 : 255;
+        const outIdx = (rowOffset + x) * 4;
+        output[outIdx]     = val;
+        output[outIdx + 1] = val;
+        output[outIdx + 2] = val;
+        output[outIdx + 3] = 255;
+      }
+    }
+    return output;
+  }
+
+  /**
+   * Adds a pure white (255) margin around a crop buffer.
+   * Essential when users drag a box tightly around finder patterns without quiet zone.
+   */
+  function padBufferWithQuietZone(src, srcW, srcH, pad = 24) {
+    const dstW = srcW + pad * 2;
+    const dstH = srcH + pad * 2;
+    const dst = new Uint8ClampedArray(dstW * dstH * 4);
+    dst.fill(255); // Pure white quiet zone
+
+    for (let y = 0; y < srcH; y++) {
+      const srcRow = y * srcW * 4;
+      const dstRow = ((y + pad) * dstW + pad) * 4;
+      dst.set(src.subarray(srcRow, srcRow + srcW * 4), dstRow);
+    }
+
+    return { data: dst, width: dstW, height: dstH, pad };
+  }
+
   function extractSubRegion(srcBuffer, srcW, x0, y0, subW, subH) {
     const safeW = Math.max(1, Math.round(subW));
     const safeH = Math.max(1, Math.round(subH));
@@ -358,15 +483,23 @@
       } catch (e) {}
     }
 
-    // 1c. Contrast enhancement on full frame
+    // 1c. Otsu's Global Binarization (vital for PDF anti-aliased gray modules)
     if (detectedQRCodes.length === 0) {
       try {
-        const contrast = enhanceContrast(rawData, width, height);
-        testWithJsQR(contrast, width, height, 0, 0, 1);
+        const otsu = otsuThreshold(rawData, width, height);
+        testWithJsQR(otsu, width, height, 0, 0, 1);
       } catch (e) {}
     }
 
-    // 1d. Sharpening filter on full frame (unblurs small QR edges)
+    // 1d. Bradley-Roth Adaptive Thresholding (uneven lighting, colored PDF backgrounds)
+    if (detectedQRCodes.length === 0) {
+      try {
+        const adapt = adaptiveThreshold(rawData, width, height);
+        testWithJsQR(adapt, width, height, 0, 0, 1);
+      } catch (e) {}
+    }
+
+    // 1e. Sharpening filter on full frame (unblurs small QR edges)
     if (detectedQRCodes.length === 0) {
       try {
         const sharp = sharpenFilter(rawData, width, height);
@@ -374,7 +507,15 @@
       } catch (e) {}
     }
 
-    // 1e. Inverted colors
+    // 1f. Contrast enhancement on full frame
+    if (detectedQRCodes.length === 0) {
+      try {
+        const contrast = enhanceContrast(rawData, width, height);
+        testWithJsQR(contrast, width, height, 0, 0, 1);
+      } catch (e) {}
+    }
+
+    // 1g. Inverted colors
     if (detectedQRCodes.length === 0) {
       try {
         const inv = invertColors(rawData, width, height);
@@ -387,7 +528,7 @@
     }
 
     // =========================================================================
-    // PASS 2: Multi-Scale Fine-Grid Tiling with 2x Upscaling for Small QRs
+    // PASS 2: Multi-Scale Fine-Grid Tiling with 2x Upscaling & Binarization
     // Subdivides large images into overlapping tiles and magnifies each tile
     // =========================================================================
     if (deepScan && (detectedQRCodes.length === 0 || detectedQRCodes.length < maxQRs)) {
@@ -423,7 +564,23 @@
             } catch (e) {}
           }
 
-          // Tile attempt 3: Sharpened tile
+          // Tile attempt 3: Otsu Binarization (Anti-aliased PDF modules)
+          if (!found) {
+            try {
+              const otsuTile = otsuThreshold(subData, subW, subH);
+              found = testWithJsQR(otsuTile, subW, subH, x0, y0, 1);
+            } catch (e) {}
+          }
+
+          // Tile attempt 4: Adaptive Threshold (Shaded/colored PDF background)
+          if (!found) {
+            try {
+              const adaptTile = adaptiveThreshold(subData, subW, subH);
+              found = testWithJsQR(adaptTile, subW, subH, x0, y0, 1);
+            } catch (e) {}
+          }
+
+          // Tile attempt 5: Sharpened tile
           if (!found) {
             try {
               const sharpTile = sharpenFilter(subData, subW, subH);
@@ -431,11 +588,19 @@
             } catch (e) {}
           }
 
-          // Tile attempt 4: Contrast enhanced tile
+          // Tile attempt 6: Contrast enhanced tile
           if (!found) {
             try {
               const contrastTile = enhanceContrast(subData, subW, subH);
-              testWithJsQR(contrastTile, subW, subH, x0, y0, 1);
+              found = testWithJsQR(contrastTile, subW, subH, x0, y0, 1);
+            } catch (e) {}
+          }
+
+          // Tile attempt 7: Inverted tile
+          if (!found) {
+            try {
+              const invTile = invertColors(subData, subW, subH);
+              testWithJsQR(invTile, subW, subH, x0, y0, 1);
             } catch (e) {}
           }
         }
@@ -446,15 +611,19 @@
   }
 
   /**
-   * Scan an explicit crop/ROI rectangle specified by user (e.g. box drag or small region)
-   * Magnifies the selected region 2x or 3x for guaranteed small-QR decoding.
+   * Scan an explicit crop/ROI rectangle specified by user (e.g. box drag or select tool).
+   * Robust against:
+   * 1. Tight selections (synthetic quiet zone padding + outward context expansion)
+   * 2. Small QRs (adaptive multi-scale 1x, 2x, 3x, 4x)
+   * 3. PDF anti-aliasing / gray blur (Otsu & Adaptive thresholding)
+   * 4. Inverted or low-contrast backgrounds
    */
   async function scanRegion(source, cropBox, options = {}) {
     if (!source) throw new Error('No source provided to scanRegion.');
     if (!cropBox) throw new Error('cropBox is required for scanRegion.');
 
-    const width = Math.max(10, Math.round(source.naturalWidth || source.width || 0));
-    const height = Math.max(10, Math.round(source.naturalHeight || source.height || 0));
+    const imgW = Math.max(10, Math.round(source.naturalWidth || source.width || 0));
+    const imgH = Math.max(10, Math.round(source.naturalHeight || source.height || 0));
 
     let boxX = Math.round(Number(cropBox.x));
     let boxY = Math.round(Number(cropBox.y));
@@ -463,13 +632,18 @@
 
     if (isNaN(boxX)) boxX = 0;
     if (isNaN(boxY)) boxY = 0;
-    if (isNaN(boxW) || boxW < 10) boxW = width;
-    if (isNaN(boxH) || boxH < 10) boxH = height;
+    if (isNaN(boxW) || boxW < 8) boxW = imgW;
+    if (isNaN(boxH) || boxH < 8) boxH = imgH;
 
-    const x0 = Math.max(0, Math.min(width - 10, boxX));
-    const y0 = Math.max(0, Math.min(height - 10, boxY));
-    const cropW = Math.max(10, Math.min(width - x0, boxW));
-    const cropH = Math.max(10, Math.min(height - y0, boxH));
+    // Expand crop box outward by 12% to capture real quiet zone if user dragged tightly
+    const expandRatio = 0.12;
+    const expandX = Math.round(boxW * expandRatio);
+    const expandY = Math.round(boxH * expandRatio);
+
+    const x0 = Math.max(0, boxX - expandX);
+    const y0 = Math.max(0, boxY - expandY);
+    const cropW = Math.min(imgW - x0, boxW + expandX * 2);
+    const cropH = Math.min(imgH - y0, boxH + expandY * 2);
 
     let subData;
 
@@ -514,7 +688,7 @@
             }];
           }
         } catch (e) {
-          // Fall through to jsQR
+          // Fall through to jsQR multi-scale pipeline
         }
       }
 
@@ -524,9 +698,9 @@
       let rawData = source.data;
       if (!rawData && typeof HTMLCanvasElement !== 'undefined' && source instanceof HTMLCanvasElement) {
         const ctx = source.getContext('2d');
-        rawData = ctx.getImageData(0, 0, width, height).data;
+        rawData = ctx.getImageData(0, 0, imgW, imgH).data;
       }
-      subData = extractSubRegion(rawData, width, x0, y0, cropW, cropH);
+      subData = extractSubRegion(rawData, imgW, x0, y0, cropW, cropH);
     }
 
     // Safety check: verify subData buffer length
@@ -535,50 +709,83 @@
       subData.fill(255);
     }
 
-    // Magnify the selected crop by 3x for small QR codes
-    const upScale = 3;
-    const upCrop = upscaleBuffer(subData, cropW, cropH, upScale);
-
     const decoder = global.jsQR || (typeof require !== 'undefined' ? require('../lib/jsQR.js') : null);
     if (!decoder) throw new Error('jsQR library not available.');
 
-    let res = decoder(upCrop.data, upCrop.width, upCrop.height, { inversionAttempts: 'attemptBoth' });
-
-    if (!res || !res.data) {
-      // Try sharpened
-      const sharp = sharpenFilter(upCrop.data, upCrop.width, upCrop.height);
-      res = decoder(sharp, upCrop.width, upCrop.height, { inversionAttempts: 'attemptBoth' });
+    // Multi-scale candidate selection:
+    // For small crops, upscaling (2x, 3x, 4x) is required so module size >= 3-4px.
+    // For large crops, 1x and 2x are optimal.
+    let scalesToTry = [1, 2, 3];
+    if (cropW < 90 || cropH < 90) {
+      scalesToTry = [3, 2, 4, 1];
+    } else if (cropW < 180 || cropH < 180) {
+      scalesToTry = [2, 1, 3];
+    } else {
+      scalesToTry = [1, 2];
     }
 
-    if (!res || !res.data) {
-      // Try contrast
-      const contrast = enhanceContrast(upCrop.data, upCrop.width, upCrop.height);
-      res = decoder(contrast, upCrop.width, upCrop.height, { inversionAttempts: 'attemptBoth' });
-    }
+    const quietPad = 24; // 24px pure white quiet zone ensures finder pattern detection
 
-    if (!res || !res.data) {
-      // Try inverted
-      const inverted = invertColors(upCrop.data, upCrop.width, upCrop.height);
-      res = decoder(inverted, upCrop.width, upCrop.height, { inversionAttempts: 'attemptBoth' });
-    }
+    for (const scale of scalesToTry) {
+      // 1. Scale buffer
+      const scaled = scale === 1
+        ? { data: new Uint8ClampedArray(subData), width: cropW, height: cropH }
+        : upscaleBuffer(subData, cropW, cropH, scale);
 
-    if (res && res.data) {
-      const bbox = calculateBoundingBox(res.location, x0, y0, 1 / upScale);
-      return [{
-        id: 1,
-        data: res.data,
-        x: bbox.x,
-        y: bbox.y,
-        width: bbox.width,
-        height: bbox.height,
-        type: detectContentType(res.data),
-        location: {
-          topLeftCorner: { x: Math.round(res.location.topLeftCorner.x / upScale + x0), y: Math.round(res.location.topLeftCorner.y / upScale + y0) },
-          topRightCorner: { x: Math.round(res.location.topRightCorner.x / upScale + x0), y: Math.round(res.location.topRightCorner.y / upScale + y0) },
-          bottomRightCorner: { x: Math.round(res.location.bottomRightCorner.x / upScale + x0), y: Math.round(res.location.bottomRightCorner.y / upScale + y0) },
-          bottomLeftCorner: { x: Math.round(res.location.bottomLeftCorner.x / upScale + x0), y: Math.round(res.location.bottomLeftCorner.y / upScale + y0) }
+      // 2. Pad buffer with pure white margin (fixes zero-quiet-zone user selections)
+      const padded = padBufferWithQuietZone(scaled.data, scaled.width, scaled.height, quietPad);
+
+      // Filter attempts to try on padded buffer:
+      const filters = [
+        { name: 'raw', getBuf: () => padded.data },
+        { name: 'otsu', getBuf: () => otsuThreshold(padded.data, padded.width, padded.height) },
+        { name: 'adaptive', getBuf: () => adaptiveThreshold(padded.data, padded.width, padded.height) },
+        { name: 'sharp', getBuf: () => sharpenFilter(padded.data, padded.width, padded.height) },
+        { name: 'contrast', getBuf: () => enhanceContrast(padded.data, padded.width, padded.height) },
+        { name: 'inverted', getBuf: () => invertColors(padded.data, padded.width, padded.height) }
+      ];
+
+      for (const filter of filters) {
+        let testBuf;
+        try {
+          testBuf = filter.getBuf();
+        } catch (e) {
+          continue;
         }
-      }];
+
+        const res = decoder(testBuf, padded.width, padded.height, { inversionAttempts: 'attemptBoth' });
+        if (res && res.data) {
+          // Map coordinates from padded, scaled buffer back to original image coordinates
+          const toOrigX = (px) => Math.round(x0 + (px - quietPad) / scale);
+          const toOrigY = (py) => Math.round(y0 + (py - quietPad) / scale);
+
+          const tl = { x: toOrigX(res.location.topLeftCorner.x), y: toOrigY(res.location.topLeftCorner.y) };
+          const tr = { x: toOrigX(res.location.topRightCorner.x), y: toOrigY(res.location.topRightCorner.y) };
+          const br = { x: toOrigX(res.location.bottomRightCorner.x), y: toOrigY(res.location.bottomRightCorner.y) };
+          const bl = { x: toOrigX(res.location.bottomLeftCorner.x), y: toOrigY(res.location.bottomLeftCorner.y) };
+
+          const minX = Math.min(tl.x, tr.x, br.x, bl.x);
+          const minY = Math.min(tl.y, tr.y, br.y, bl.y);
+          const maxX = Math.max(tl.x, tr.x, br.x, bl.x);
+          const maxY = Math.max(tl.y, tr.y, br.y, bl.y);
+
+          return [{
+            id: 1,
+            data: res.data,
+            x: Math.max(0, minX),
+            y: Math.max(0, minY),
+            width: Math.max(10, maxX - minX),
+            height: Math.max(10, maxY - minY),
+            type: detectContentType(res.data),
+            location: {
+              topLeftCorner: tl,
+              topRightCorner: tr,
+              bottomRightCorner: br,
+              bottomLeftCorner: bl
+            }
+          }];
+        }
+      }
     }
 
     return [];
@@ -592,7 +799,10 @@
     enhanceContrast,
     sharpenFilter,
     invertColors,
-    upscaleBuffer
+    upscaleBuffer,
+    otsuThreshold,
+    adaptiveThreshold,
+    padBufferWithQuietZone
   };
 
   if (typeof module !== 'undefined' && module.exports) {

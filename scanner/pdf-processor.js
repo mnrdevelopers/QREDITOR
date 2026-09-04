@@ -70,10 +70,10 @@
    * Render a specific page of a PDF document to an HTMLCanvasElement
    * @param {object} pdfDoc The pdf.js document
    * @param {number} pageNumber 1-indexed page number
-   * @param {number} scale Scale multiplier (default 2.0 = ~150 DPI for crisp QR detection)
+   * @param {number} scale Scale multiplier (default 2.75 = ~200 DPI for high-fidelity QR detection)
    * @returns {Promise<HTMLCanvasElement>} Rendered canvas
    */
-  async function renderPageToCanvas(pdfDoc, pageNumber = 1, scale = 2.0) {
+  async function renderPageToCanvas(pdfDoc, pageNumber = 1, scale = 2.75) {
     const page = await pdfDoc.getPage(pageNumber);
     const viewport = page.getViewport({ scale });
 

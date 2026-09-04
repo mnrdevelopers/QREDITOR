@@ -105,6 +105,39 @@
 
   btnDismissError.addEventListener('click', hideError);
 
+  // Progress Bar & Laser Scanline Elements
+  const popupProgressCard = document.getElementById('popupProgressCard');
+  const popupProgressText = document.getElementById('popupProgressText');
+  const popupProgressPercent = document.getElementById('popupProgressPercent');
+  const popupProgressFill = document.getElementById('popupProgressFill');
+  const popupScanline = document.getElementById('popupScanline');
+
+  function showPopupProgress(percent, text) {
+    if (!popupProgressCard) return;
+    popupProgressCard.style.display = 'block';
+    updatePopupProgress(percent, text);
+  }
+
+  function updatePopupProgress(percent, text) {
+    const clamped = Math.max(0, Math.min(100, Math.round(percent)));
+    if (popupProgressFill) popupProgressFill.style.width = `${clamped}%`;
+    if (popupProgressPercent) popupProgressPercent.textContent = `${clamped}%`;
+    if (text && popupProgressText) popupProgressText.textContent = text;
+  }
+
+  function hidePopupProgress() {
+    if (!popupProgressCard) return;
+    setTimeout(() => {
+      popupProgressCard.style.display = 'none';
+    }, 450);
+  }
+
+  function setPopupScanline(active) {
+    if (popupScanline) {
+      popupScanline.style.display = active ? 'block' : 'none';
+    }
+  }
+
   // File type validation
   const SUPPORTED_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'application/pdf'];
 
@@ -237,12 +270,15 @@
     if (pdfPageBar) pdfPageBar.style.display = pdfNumPages > 1 ? 'flex' : 'none';
 
     setStatus('scanning', `RENDERING PAGE ${pageNum}...`);
+    showPopupProgress(30, `Rendering PDF Page ${pageNum}...`);
     try {
-      const renderedCanvas = await PDFProcessor.renderPageToCanvas(loadedPdfDoc, pageNum, 2.0);
+      const renderedCanvas = await PDFProcessor.renderPageToCanvas(loadedPdfDoc, pageNum, 2.75);
       loadedImage = renderedCanvas;
+      updatePopupProgress(80, `Page ${pageNum} rendered`);
       displayLoadedImage();
       await scanCurrentSource();
     } catch (err) {
+      hidePopupProgress();
       showError(`Failed to render PDF page ${pageNum}: ` + (err.message || 'Unknown error'));
     }
   }
@@ -333,12 +369,20 @@
 
     hideError();
     setStatus('scanning', 'SCANNING...');
+    setPopupScanline(true);
+    showPopupProgress(25, 'Analyzing image channels...');
 
     // Small delay to permit UI repaint
-    await new Promise(r => setTimeout(r, 40));
+    await new Promise(r => setTimeout(r, 50));
 
     try {
+      updatePopupProgress(60, 'Evaluating contrast & Otsu binarization...');
+      await new Promise(r => setTimeout(r, 40));
+
       detectedQRCodes = await QRScanner.scanQRCode(loadedImage, { deepScan: true });
+      updatePopupProgress(100, detectedQRCodes.length > 0 ? `${detectedQRCodes.length} QR Code(s) Detected!` : 'Scan completed');
+      setPopupScanline(false);
+      hidePopupProgress();
 
       if (!detectedQRCodes || detectedQRCodes.length === 0) {
         setStatus('error', 'NO QR DETECTED');
@@ -356,6 +400,8 @@
       setStatus('detected', 'QR DETECTED ✓');
       displayQRResults();
     } catch (err) {
+      setPopupScanline(false);
+      hidePopupProgress();
       showError('Detection failed: ' + (err.message || 'Unknown scanning error'));
     }
   }
@@ -477,6 +523,7 @@
 
     hideError();
     setStatus('generating', 'GENERATING...');
+    showPopupProgress(35, 'Generating QR matrix...');
 
     await new Promise(r => setTimeout(r, 40));
 
@@ -492,7 +539,11 @@
 
       // Verification step
       setStatus('verifying', 'VERIFYING...');
+      updatePopupProgress(75, 'Verifying checksum...');
       const verifyRes = await QRGenerator.verifyQRCode(qrCanvas, newText);
+
+      updatePopupProgress(100, verifyRes.success ? 'Checksum verified ✓' : 'Verification failed');
+      hidePopupProgress();
 
       if (verifyRes.success) {
         generatedQRCanvas = qrCanvas;
@@ -516,6 +567,7 @@
         showError('New QR verification failed: ' + (verifyRes.error || 'The replacement was cancelled.'));
       }
     } catch (err) {
+      hidePopupProgress();
       showError('QR Generation Error: ' + (err.message || 'Unknown error'));
     }
   });
@@ -529,6 +581,7 @@
 
     try {
       const currentQR = detectedQRCodes[selectedQRIndex];
+      showPopupProgress(50, isPdfMode ? 'Embedding into PDF document...' : 'Applying high-res replacement...');
 
       if (isPdfMode) {
         setStatus('generating', 'UPDATING PDF...');
@@ -557,6 +610,8 @@
         renderToPreviewCanvas(replacedCanvas);
         qrOverlayBox.style.display = 'none';
 
+        updatePopupProgress(100, 'PDF Replaced Successfully!');
+        hidePopupProgress();
         setStatus('success', 'PDF QR REPLACED ✓');
         qrPreviewCard.style.display = 'none';
         editCard.style.display = 'none';
@@ -580,18 +635,19 @@
       renderToPreviewCanvas(replacedCanvas);
       qrOverlayBox.style.display = 'none';
 
-      // Show success
-      setStatus('success', 'REPLACEMENT COMPLETE ✓');
+      updatePopupProgress(100, 'QR Replaced Successfully!');
+      hidePopupProgress();
+      setStatus('success', 'QR REPLACED SUCCESSFULLY ✓');
       qrPreviewCard.style.display = 'none';
       editCard.style.display = 'none';
       successCard.style.display = 'flex';
 
       const isPng = currentFile.name.toLowerCase().endsWith('.png');
-      resolutionNote.textContent = `Native resolution (${replacedCanvas.width} × ${replacedCanvas.height} px) preserved.`;
-
-      btnDownloadDefault.textContent = isPng ? 'Download PNG' : 'Download JPG';
-      btnDownloadAlt.textContent = isPng ? 'Download JPG' : 'Download PNG';
+      resolutionNote.textContent = `Original ${replacedCanvas.width} × ${replacedCanvas.height} px resolution preserved.`;
+      btnDownloadDefault.textContent = isPng ? 'Download PNG (Original Quality)' : 'Download JPG (Original Quality)';
+      btnDownloadAlt.textContent = isPng ? 'Download as JPG' : 'Download as PNG';
     } catch (err) {
+      hidePopupProgress();
       showError('Replacement failed: ' + (err.message || 'Unknown replacement error'));
     }
   });

@@ -133,6 +133,73 @@
 
   btnDismissError.addEventListener('click', hideError);
 
+  // Workflow Stepper & Progress Bar Elements
+  const scanlineOverlay = document.getElementById('scanlineOverlay');
+  const operationProgressCard = document.getElementById('operationProgressCard');
+  const progressTitle = document.getElementById('progressTitle');
+  const progressPercent = document.getElementById('progressPercent');
+  const progressFill = document.getElementById('progressFill');
+  const progressDetail = document.getElementById('progressDetail');
+  const progressPhase = document.getElementById('progressPhase');
+
+  const stepUpload = document.getElementById('stepUpload');
+  const stepScan = document.getElementById('stepScan');
+  const stepEdit = document.getElementById('stepEdit');
+  const stepVerify = document.getElementById('stepVerify');
+  const stepExport = document.getElementById('stepExport');
+
+  function setWorkflowStep(step) {
+    const steps = [
+      { num: 1, node: stepUpload, line: null },
+      { num: 2, node: stepScan, line: document.getElementById('stepLine1') },
+      { num: 3, node: stepEdit, line: document.getElementById('stepLine2') },
+      { num: 4, node: stepVerify, line: document.getElementById('stepLine3') },
+      { num: 5, node: stepExport, line: document.getElementById('stepLine4') }
+    ];
+
+    steps.forEach(s => {
+      if (!s.node) return;
+      s.node.classList.remove('active', 'completed');
+      if (s.line) s.line.classList.remove('completed');
+
+      if (s.num < step) {
+        s.node.classList.add('completed');
+        if (s.line) s.line.classList.add('completed');
+      } else if (s.num === step) {
+        s.node.classList.add('active');
+        if (s.line) s.line.classList.add('completed');
+      }
+    });
+  }
+
+  function showProgress(percent, title, detail, phase) {
+    if (!operationProgressCard) return;
+    operationProgressCard.style.display = 'block';
+    if (title && progressTitle) progressTitle.textContent = title;
+    updateProgress(percent, detail, phase);
+  }
+
+  function updateProgress(percent, detail, phase) {
+    const clamped = Math.max(0, Math.min(100, Math.round(percent)));
+    if (progressFill) progressFill.style.width = `${clamped}%`;
+    if (progressPercent) progressPercent.textContent = `${clamped}%`;
+    if (detail && progressDetail) progressDetail.textContent = detail;
+    if (phase && progressPhase) progressPhase.textContent = phase;
+  }
+
+  function hideProgress() {
+    if (!operationProgressCard) return;
+    setTimeout(() => {
+      operationProgressCard.style.display = 'none';
+    }, 450);
+  }
+
+  function setScanline(active) {
+    if (scanlineOverlay) {
+      scanlineOverlay.style.display = active ? 'block' : 'none';
+    }
+  }
+
   function formatBytes(bytes) {
     if (!bytes) return '0 KB';
     if (bytes < 1024) return bytes + ' B';
@@ -251,11 +318,15 @@
     if (pdfToolbarDivider) pdfToolbarDivider.style.display = pdfNumPages > 1 ? 'block' : 'none';
 
     setStatus('scanning', `RENDERING PAGE ${pageNum}...`);
+    showProgress(35, 'Rendering PDF Page', `Rasterizing vector page ${pageNum} at high DPI...`, `Page ${pageNum}/${pdfNumPages}`);
     try {
-      const renderedCanvas = await PDFProcessor.renderPageToCanvas(loadedPdfDoc, pageNum, 2.0);
+      const renderedCanvas = await PDFProcessor.renderPageToCanvas(loadedPdfDoc, pageNum, 2.75);
       originalImage = renderedCanvas;
+      updateProgress(100, `Page ${pageNum} rendered successfully`, 'Done');
+      hideProgress();
       initializeWorkspace();
     } catch (err) {
+      hideProgress();
       showError(`Failed to render PDF page ${pageNum}: ` + (err.message || 'Unknown error'));
     }
   }
@@ -354,13 +425,41 @@
   async function triggerScan(deep = true) {
     if (!originalImage) return;
     hideError();
+    setWorkflowStep(2);
     setStatus('scanning', deep ? 'SCANNING (DEEP PASS)...' : 'SCANNING...');
     valStatus.textContent = deep ? 'Deep multi-scale scanning...' : 'Scanning...';
+    setScanline(true);
+    showProgress(15, 'Scanning QR Codes', 'Preparing image & color channels...', 'Pass 1/2');
 
-    await new Promise(r => setTimeout(r, 40));
+    await new Promise(r => setTimeout(r, 60));
 
     try {
+      updateProgress(45, 'Evaluating full-frame binarization & Otsu filters...', 'Pass 1/2');
+      await new Promise(r => setTimeout(r, 40));
+
       detectedQRCodes = await QRScanner.scanQRCode(originalImage, { deepScan: deep });
+      updateProgress(75, 'Analyzing overlapping tiles & fine-grid matrices...', 'Pass 2/2');
+
+      // Ultra-HD fallback for dense PDF pages (e.g. tiny 10-15mm invoice QR codes)
+      if ((!detectedQRCodes || detectedQRCodes.length === 0) && isPdfMode && loadedPdfDoc && deep) {
+        setStatus('scanning', 'ULTRA-RES RE-SCAN (3.5x)...');
+        valStatus.textContent = 'Enhancing PDF resolution for tiny QRs...';
+        updateProgress(85, 'Rendering ultra-definition PDF layer at 3.5x...', 'Deep HD Pass');
+        try {
+          const ultraCanvas = await PDFProcessor.renderPageToCanvas(loadedPdfDoc, pdfCurrentPage, 3.5);
+          const ultraResults = await QRScanner.scanQRCode(ultraCanvas, { deepScan: true });
+          if (ultraResults && ultraResults.length > 0) {
+            detectedQRCodes = ultraResults;
+            originalImage = ultraCanvas;
+            renderToMainCanvas(originalImage);
+            fitToViewport();
+          }
+        } catch (ultraErr) {}
+      }
+
+      updateProgress(100, detectedQRCodes.length > 0 ? `${detectedQRCodes.length} QR Code(s) Detected!` : 'Scan completed', 'Finished');
+      setScanline(false);
+      hideProgress();
 
       if (!detectedQRCodes || detectedQRCodes.length === 0) {
         setStatus('error', 'NO QR DETECTED');
@@ -375,6 +474,8 @@
       valStatus.textContent = `${detectedQRCodes.length} QR Code(s) Detected`;
       displayQRDetails();
     } catch (err) {
+      setScanline(false);
+      hideProgress();
       showError('Scanning failed: ' + (err.message || 'Unknown error'));
     }
   }
@@ -458,8 +559,11 @@
     if (boxW < 6 || boxH < 6) return;
 
     hideError();
-    setStatus('scanning', 'MAGNIFYING & SCANNING SELECTION...');
+    setWorkflowStep(2);
+    setStatus('scanning', 'SCANNING SELECTION...');
     valStatus.textContent = 'Scanning selection...';
+    setScanline(true);
+    showProgress(25, 'Scanning Selection', 'Extracting region with quiet zone padding...', 'Step 1/2');
 
     // Safely map screen display coordinates back to high-res native image/PDF coordinates
     const origW = originalImage.naturalWidth || originalImage.width || mainCanvas.width;
@@ -478,7 +582,14 @@
     };
 
     try {
+      updateProgress(65, 'Evaluating multi-scale binarization & filters...', 'Step 2/2');
+      await new Promise(r => setTimeout(r, 40));
+
       const results = await QRScanner.scanRegion(originalImage, cropBox);
+      updateProgress(100, results && results.length > 0 ? 'QR Decoded Successfully!' : 'No QR in region', 'Done');
+      setScanline(false);
+      hideProgress();
+
       if (results && results.length > 0) {
         detectedQRCodes = results;
         selectedQRIndex = 0;
@@ -490,6 +601,8 @@
         showError('Could not decode a QR code in the selected area. Try zooming in and selecting closely around the QR code.');
       }
     } catch (err) {
+      setScanline(false);
+      hideProgress();
       showError('Selection scan error: ' + (err.message || 'Unable to decode selected region'));
     }
   });
@@ -598,6 +711,7 @@
     const currentQR = detectedQRCodes[selectedQRIndex];
     if (!currentQR) return;
 
+    setWorkflowStep(3);
     setStatus('editing', 'EDITING');
     panelEdit.style.display = 'flex';
     verificationBox.style.display = 'none';
@@ -606,6 +720,7 @@
   });
 
   btnCancelEdit.addEventListener('click', () => {
+    setWorkflowStep(2);
     panelEdit.style.display = 'none';
     verificationBox.style.display = 'none';
     setStatus('detected', 'QR DETECTED ✓');
@@ -621,6 +736,7 @@
 
     hideError();
     setStatus('generating', 'GENERATING...');
+    showProgress(35, 'Generating QR', 'Synthesizing clean module matrix...', 'Step 1/2');
 
     await new Promise(r => setTimeout(r, 40));
 
@@ -638,9 +754,14 @@
 
       // Verification step
       setStatus('verifying', 'VERIFYING...');
+      updateProgress(75, 'Verifying Reed-Solomon payload checksum...', 'Step 2/2');
       const verifyRes = await QRGenerator.verifyQRCode(qrCanvas, newText);
 
+      updateProgress(100, verifyRes.success ? 'Checksum verified ✓' : 'Verification failed', 'Done');
+      hideProgress();
+
       if (verifyRes.success) {
+        setWorkflowStep(4);
         generatedQRCanvas = qrCanvas;
         verifyBadge.className = 'verify-badge';
         verifyBadgeIcon.textContent = '✓';
@@ -661,6 +782,7 @@
         showError('New QR verification failed: ' + (verifyRes.error || 'The replacement was cancelled.'));
       }
     } catch (err) {
+      hideProgress();
       showError('Generation Error: ' + (err.message || 'Unknown error'));
     }
   });
@@ -737,6 +859,7 @@
 
       panelEdit.style.display = 'none';
       panelExport.style.display = 'flex';
+      setWorkflowStep(5);
       setStatus('success', 'REPLACEMENT COMPLETE ✓');
 
       const isPng = currentFile.name.toLowerCase().endsWith('.png');
@@ -858,6 +981,9 @@
     panelExport.style.display = 'none';
     bboxOverlay.style.display = 'none';
 
+    setWorkflowStep(1);
+    setScanline(false);
+    hideProgress();
     hideError();
     setStatus('ready', 'READY');
   }

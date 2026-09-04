@@ -3,7 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>QR Code Editor & Replacer - Workspace</title>
+  <title>QR Code Studio & Replacer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="editor.css">
 </head>
 <body>
@@ -23,26 +26,52 @@
           </svg>
         </div>
         <div class="app-titles">
-          <h1 class="main-title">QR Code Editor & Replacer</h1>
-          <span class="sub-badge">Client-Side Engine • V1</span>
+          <h1 class="main-title">QR Studio & Replacer</h1>
+          <span class="sub-badge">Client-Side Engine</span>
         </div>
       </div>
 
       <div class="nav-center">
-        <div class="status-indicator" id="statusBar">
-          <span class="status-dot"></span>
-          <span class="status-label" id="statusLabel">READY</span>
+        <div class="workflow-stepper" id="workflowStepper">
+          <div class="step-node active" id="stepUpload" data-step="1">
+            <span class="step-dot">1</span>
+            <span class="step-label">Upload</span>
+          </div>
+          <div class="step-line" id="stepLine1"></div>
+          <div class="step-node" id="stepScan" data-step="2">
+            <span class="step-dot">2</span>
+            <span class="step-label">Detect</span>
+          </div>
+          <div class="step-line" id="stepLine2"></div>
+          <div class="step-node" id="stepEdit" data-step="3">
+            <span class="step-dot">3</span>
+            <span class="step-label">Edit</span>
+          </div>
+          <div class="step-line" id="stepLine3"></div>
+          <div class="step-node" id="stepVerify" data-step="4">
+            <span class="step-dot">4</span>
+            <span class="step-label">Replace</span>
+          </div>
+          <div class="step-line" id="stepLine4"></div>
+          <div class="step-node" id="stepExport" data-step="5">
+            <span class="step-dot">5</span>
+            <span class="step-label">Export</span>
+          </div>
         </div>
       </div>
 
       <div class="nav-right">
+        <div class="status-indicator" id="statusBar">
+          <span class="status-dot"></span>
+          <span class="status-label" id="statusLabel">READY</span>
+        </div>
         <button id="btnNewImage" class="btn btn-outline">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
             <polyline points="17 8 12 3 7 8"></polyline>
             <line x1="12" y1="3" x2="12" y2="15"></line>
           </svg>
-          Open New File
+          Open File
         </button>
       </div>
     </header>
@@ -106,6 +135,10 @@
         <div class="canvas-stage" id="canvasStage" style="display: none;">
           <div class="canvas-container" id="canvasContainer">
             <canvas id="mainCanvas"></canvas>
+            <div class="scanline-overlay" id="scanlineOverlay" style="display: none;">
+              <div class="scanline-laser"></div>
+              <div class="scanline-radar"></div>
+            </div>
             <div class="bounding-box-overlay" id="bboxOverlay" style="display: none;">
               <span class="bbox-tag" id="bboxTag">QR #1</span>
             </div>
@@ -133,6 +166,24 @@
 
       <!-- Right: Control Sidebar -->
       <aside class="sidebar" id="sidebar">
+        <!-- Live Operation Progress Bar Card -->
+        <div class="progress-card" id="operationProgressCard" style="display: none;">
+          <div class="progress-header">
+            <div class="progress-title-row">
+              <span class="progress-spinner"></span>
+              <span class="progress-title" id="progressTitle">Analyzing QR Codes...</span>
+            </div>
+            <span class="progress-percent" id="progressPercent">0%</span>
+          </div>
+          <div class="progress-track">
+            <div class="progress-fill" id="progressFill" style="width: 0%;"></div>
+          </div>
+          <div class="progress-meta">
+            <span class="progress-detail" id="progressDetail">Initializing scan engine...</span>
+            <span class="progress-time" id="progressPhase">Step 1/3</span>
+          </div>
+        </div>
+
         <!-- Panel 1: Image Information -->
         <section class="side-panel" id="panelMeta" style="display: none;">
           <div class="panel-header">

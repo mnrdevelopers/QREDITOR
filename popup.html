@@ -3,7 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>QR Code Editor</title>
+  <title>QR Code Studio</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="popup.css">
 </head>
 <body>
@@ -23,17 +26,17 @@
           </svg>
         </div>
         <div>
-          <h1 class="title">QR EDITOR</h1>
-          <p class="subtitle">Scan • Edit • Replace QR Codes</p>
+          <h1 class="title">QR STUDIO</h1>
+          <p class="subtitle">Scan • Edit • Replace • Verify</p>
         </div>
       </div>
       <button id="btnOpenEditorTab" class="icon-btn" title="Open Full Screen Editor">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
           <polyline points="15 3 21 3 21 9"></polyline>
           <line x1="10" y1="14" x2="21" y2="3"></line>
         </svg>
-        <span>Full Editor</span>
+        <span>Full Studio</span>
       </button>
     </header>
 
@@ -43,18 +46,34 @@
       <span class="status-text" id="statusText">READY</span>
     </div>
 
+    <!-- Live Animated Progress Bar -->
+    <div class="popup-progress-card" id="popupProgressCard" style="display: none;">
+      <div class="popup-progress-top">
+        <div class="popup-progress-label-wrap">
+          <span class="popup-progress-spinner"></span>
+          <span class="popup-progress-text" id="popupProgressText">Scanning QR...</span>
+        </div>
+        <span class="popup-progress-val" id="popupProgressPercent">0%</span>
+      </div>
+      <div class="popup-progress-track">
+        <div class="popup-progress-bar" id="popupProgressFill" style="width: 0%;"></div>
+      </div>
+    </div>
+
     <!-- Drop Zone / Upload Area -->
     <div class="drop-zone" id="dropZone">
       <input type="file" id="fileInput" accept="image/jpeg,image/png,image/webp,image/jpg,application/pdf,.pdf" class="file-input-hidden">
       <div class="drop-zone-prompt" id="dropPrompt">
-        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="1.8">
-          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-          <polyline points="17 8 12 3 7 8"></polyline>
-          <line x1="12" y1="3" x2="12" y2="15"></line>
-        </svg>
-        <p class="drop-main-text">Drop an image or PDF here or click to choose</p>
-        <p class="drop-sub-text">Supported formats: JPG • JPEG • PNG • WEBP • PDF</p>
-        <button type="button" class="btn btn-secondary btn-sm" id="btnChooseFile">Choose File</button>
+        <div class="drop-icon-box">
+          <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="17 8 12 3 7 8"></polyline>
+            <line x1="12" y1="3" x2="12" y2="15"></line>
+          </svg>
+        </div>
+        <p class="drop-main-text">Drop image or PDF here</p>
+        <p class="drop-sub-text">JPG • PNG • WEBP • PDF (High DPI)</p>
+        <button type="button" class="btn btn-primary btn-sm" id="btnChooseFile">Choose File</button>
       </div>
 
       <!-- Image / PDF Info & Preview Container -->
@@ -74,6 +93,9 @@
 
         <div class="canvas-wrapper" id="canvasWrapper">
           <canvas id="previewCanvas"></canvas>
+          <div class="popup-scanline" id="popupScanline" style="display: none;">
+            <div class="popup-scanline-laser"></div>
+          </div>
           <div class="overlay-box" id="qrOverlayBox" style="display: none;"></div>
         </div>
 
