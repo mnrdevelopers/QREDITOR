@@ -263,6 +263,48 @@ async function runTests() {
     assert(reloadedDoc.getPageCount() === 1, 'TEST 12c: Modified PDF reloads cleanly and preserves page count');
   }
 
+  // TEST 13: PDF Text Replacement
+  {
+    const PDFTextProcessor = require('./scanner/pdf-text-processor.js');
+    const PDFLib = require('./lib/pdf-lib.min.js');
+
+    // Create a base PDF
+    const pdfDoc = await PDFLib.PDFDocument.create();
+    const page = pdfDoc.addPage([600, 800]);
+    const font = await pdfDoc.embedFont(PDFLib.StandardFonts.Helvetica);
+    page.drawText('Original Total: $120.00', { x: 50, y: 700, size: 14, font });
+    const originalPdfBytes = await pdfDoc.save();
+
+    const replacements = [
+      {
+        id: 'line_1',
+        bbox: { canvasX: 50, canvasY: 100, canvasW: 200, canvasH: 20 },
+        originalText: 'Original Total: $120.00',
+        newText: 'Modified Total: $250.00',
+        fontFamily: 'Helvetica',
+        fontSize: 14,
+        color: { r: 0, g: 0.5, b: 0 },
+        padding: 3
+      }
+    ];
+
+    const canvasDims = { width: 600, height: 800 };
+
+    const modifiedPdfBytes = await PDFTextProcessor.replaceTextOnPDF(
+      originalPdfBytes,
+      1,
+      replacements,
+      canvasDims
+    );
+
+    assert(modifiedPdfBytes instanceof Uint8Array && modifiedPdfBytes.length > 0,
+      'TEST 13a: PDFTextProcessor.replaceTextOnPDF returned valid modified byte stream');
+
+    const reloadedDoc = await PDFLib.PDFDocument.load(modifiedPdfBytes);
+    assert(reloadedDoc.getPageCount() === 1,
+      'TEST 13b: Reloaded modified text PDF contains valid structure');
+  }
+
   console.log(`\n=== RESULTS: ${passedTests} / ${totalTests} TESTS PASSED ===\n`);
 }
 

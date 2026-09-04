@@ -25,6 +25,12 @@
   let pdfCurrentPage = 1;
   let replacedPdfBytes = null;
 
+  // Mode & PDF Text Editor State
+  let currentEditorMode = 'qr'; // 'qr' | 'text'
+  let detectedTextLines = [];
+  let selectedTextLine = null;
+  let textReplacements = [];
+
   // Viewport Zoom & Mode State
   let zoomLevel = 1.0;
   let currentViewMode = 'result'; // 'result' | 'original' | 'split'
@@ -36,6 +42,11 @@
 
   const viewport = document.getElementById('viewport');
   const viewportToolbar = document.getElementById('viewportToolbar');
+  const btnModeQR = document.getElementById('btnModeQR');
+  const btnModeText = document.getElementById('btnModeText');
+  const qrToolGroup = document.getElementById('qrToolGroup');
+  const textOverlayLayer = document.getElementById('textOverlayLayer');
+
   const btnZoomOut = document.getElementById('btnZoomOut');
   const btnZoomIn = document.getElementById('btnZoomIn');
   const btnZoomFit = document.getElementById('btnZoomFit');
@@ -110,6 +121,22 @@
   const btnDownloadDefault = document.getElementById('btnDownloadDefault');
   const btnDownloadAlt = document.getElementById('btnDownloadAlt');
   const btnStartOver = document.getElementById('btnStartOver');
+
+  // Text Editor DOM Elements
+  const panelTextEdit = document.getElementById('panelTextEdit');
+  const textCountBadge = document.getElementById('textCountBadge');
+  const selectedTextOriginal = document.getElementById('selectedTextOriginal');
+  const selectedTextNew = document.getElementById('selectedTextNew');
+  const textFontFamily = document.getElementById('textFontFamily');
+  const textFontSize = document.getElementById('textFontSize');
+  const textColor = document.getElementById('textColor');
+  const textMaskPadding = document.getElementById('textMaskPadding');
+  const btnApplyTextEdit = document.getElementById('btnApplyTextEdit');
+  const btnCancelTextEdit = document.getElementById('btnCancelTextEdit');
+  const replacementsContainer = document.getElementById('replacementsContainer');
+  const replacementsList = document.getElementById('replacementsList');
+  const replacementCount = document.getElementById('replacementCount');
+  const btnDownloadTextPdf = document.getElementById('btnDownloadTextPdf');
 
   const errorBox = document.getElementById('errorBox');
   const errorText = document.getElementById('errorText');
@@ -250,11 +277,21 @@
     if (pdfToolbarControls) pdfToolbarControls.style.display = pdfNumPages > 1 ? 'flex' : 'none';
     if (pdfToolbarDivider) pdfToolbarDivider.style.display = pdfNumPages > 1 ? 'block' : 'none';
 
+    // Reset page-level text items
+    detectedTextLines = [];
+    selectedTextLine = null;
+    textReplacements = [];
+    updateReplacementsListUI();
+
     setStatus('scanning', `RENDERING PAGE ${pageNum}...`);
     try {
       const renderedCanvas = await PDFProcessor.renderPageToCanvas(loadedPdfDoc, pageNum, 2.0);
       originalImage = renderedCanvas;
       initializeWorkspace();
+
+      if (currentEditorMode === 'text') {
+        loadAndRenderPageText();
+      }
     } catch (err) {
       showError(`Failed to render PDF page ${pageNum}: ` + (err.message || 'Unknown error'));
     }
@@ -330,6 +367,7 @@
     mainCanvas.style.height = `${displayH}px`;
 
     updateBboxOverlay();
+    renderTextOverlay();
   }
 
   btnZoomIn.addEventListener('click', () => applyZoom(zoomLevel * 1.25));
@@ -822,6 +860,21 @@
     pdfNumPages = 0;
     pdfCurrentPage = 1;
     replacedPdfBytes = null;
+
+    currentEditorMode = 'qr';
+    if (btnModeQR) btnModeQR.classList.add('active-tab');
+    if (btnModeText) btnModeText.classList.remove('active-tab');
+    detectedTextLines = [];
+    selectedTextLine = null;
+    textReplacements = [];
+
+    if (textOverlayLayer) {
+      textOverlayLayer.innerHTML = '';
+      textOverlayLayer.style.display = 'none';
+    }
+    if (panelTextEdit) panelTextEdit.style.display = 'none';
+    if (qrToolGroup) qrToolGroup.style.display = 'flex';
+
     if (pdfToolbarControls) pdfToolbarControls.style.display = 'none';
     if (pdfToolbarDivider) pdfToolbarDivider.style.display = 'none';
 
@@ -843,6 +896,239 @@
   }
 
   btnStartOver.addEventListener('click', resetAll);
+
+  // ==========================================
+  // PDF Text Editor Mode & Handlers
+  // ==========================================
+
+  function setEditorMode(mode) {
+    currentEditorMode = mode;
+    if (btnModeQR) btnModeQR.classList.toggle('active-tab', mode === 'qr');
+    if (btnModeText) btnModeText.classList.toggle('active-tab', mode === 'text');
+
+    if (mode === 'text') {
+      if (!isPdfMode) {
+        showError('PDF Text Editor is available for PDF documents. Please upload a PDF.');
+        setEditorMode('qr');
+        return;
+      }
+      bboxOverlay.style.display = 'none';
+      if (qrToolGroup) qrToolGroup.style.display = 'none';
+      panelDetection.style.display = 'none';
+      panelEdit.style.display = 'none';
+      panelExport.style.display = 'none';
+      panelMeta.style.display = 'none';
+      if (panelTextEdit) panelTextEdit.style.display = 'flex';
+      if (textOverlayLayer) textOverlayLayer.style.display = 'block';
+
+      loadAndRenderPageText();
+    } else {
+      if (textOverlayLayer) textOverlayLayer.style.display = 'none';
+      if (panelTextEdit) panelTextEdit.style.display = 'none';
+      panelMeta.style.display = 'flex';
+      if (qrToolGroup) qrToolGroup.style.display = 'flex';
+      if (detectedQRCodes.length > 0) {
+        panelDetection.style.display = 'flex';
+        updateBboxOverlay();
+      }
+    }
+  }
+
+  if (btnModeQR) btnModeQR.addEventListener('click', () => setEditorMode('qr'));
+  if (btnModeText) btnModeText.addEventListener('click', () => setEditorMode('text'));
+
+  async function loadAndRenderPageText() {
+    if (!loadedPdfDoc) return;
+    setStatus('scanning', `EXTRACTING TEXT (PAGE ${pdfCurrentPage})...`);
+    const canvasDims = {
+      width: originalImage.naturalWidth || originalImage.width,
+      height: originalImage.naturalHeight || originalImage.height
+    };
+
+    try {
+      detectedTextLines = await PDFTextProcessor.extractTextLines(loadedPdfDoc, pdfCurrentPage, canvasDims);
+      if (textCountBadge) {
+        textCountBadge.textContent = `${detectedTextLines.length} Line${detectedTextLines.length === 1 ? '' : 's'}`;
+      }
+      renderTextOverlay();
+      setStatus('ready', 'TEXT READY FOR EDITING');
+    } catch (err) {
+      showError('Text extraction error: ' + (err.message || 'Unknown error'));
+    }
+  }
+
+  function renderTextOverlay() {
+    if (!textOverlayLayer) return;
+    textOverlayLayer.innerHTML = '';
+    if (currentEditorMode !== 'text') return;
+
+    detectedTextLines.forEach(line => {
+      const box = document.createElement('div');
+      box.className = 'text-block-highlight';
+      box.dataset.id = line.id;
+      box.title = `Click to edit: "${line.text}"`;
+
+      if (textReplacements.some(r => r.id === line.id)) {
+        box.classList.add('modified');
+      }
+
+      if (selectedTextLine && selectedTextLine.id === line.id) {
+        box.classList.add('selected');
+      }
+
+      box.style.left = `${Math.round(line.canvasX * zoomLevel)}px`;
+      box.style.top = `${Math.round(line.canvasY * zoomLevel)}px`;
+      box.style.width = `${Math.round(line.canvasW * zoomLevel)}px`;
+      box.style.height = `${Math.round(line.canvasH * zoomLevel)}px`;
+
+      box.addEventListener('click', (e) => {
+        e.stopPropagation();
+        selectTextLine(line);
+      });
+
+      textOverlayLayer.appendChild(box);
+    });
+  }
+
+  function selectTextLine(line) {
+    selectedTextLine = line;
+    if (selectedTextOriginal) selectedTextOriginal.value = line.text;
+
+    const existing = textReplacements.find(r => r.id === line.id);
+    if (selectedTextNew) selectedTextNew.value = existing ? existing.newText : line.text;
+    if (textFontSize) textFontSize.value = Math.round(line.fontSize || 12);
+    if (btnApplyTextEdit) btnApplyTextEdit.disabled = false;
+    if (selectedTextNew) selectedTextNew.focus();
+
+    renderTextOverlay();
+  }
+
+  if (btnApplyTextEdit) {
+    btnApplyTextEdit.addEventListener('click', () => {
+      if (!selectedTextLine) return;
+      const newText = selectedTextNew.value;
+
+      const hexColor = textColor ? textColor.value : '#000000';
+      const r = parseInt(hexColor.slice(1, 3), 16) / 255;
+      const g = parseInt(hexColor.slice(3, 5), 16) / 255;
+      const b = parseInt(hexColor.slice(5, 7), 16) / 255;
+
+      const replacement = {
+        id: selectedTextLine.id,
+        bbox: {
+          x: selectedTextLine.canvasX,
+          y: selectedTextLine.canvasY,
+          width: selectedTextLine.canvasW,
+          height: selectedTextLine.canvasH
+        },
+        originalText: selectedTextLine.text,
+        newText: newText,
+        fontFamily: textFontFamily ? textFontFamily.value : 'Helvetica',
+        fontSize: parseFloat(textFontSize ? textFontSize.value : 12) || selectedTextLine.fontSize,
+        color: { r, g, b },
+        padding: parseInt(textMaskPadding ? textMaskPadding.value : 2, 10) || 2
+      };
+
+      const idx = textReplacements.findIndex(r => r.id === selectedTextLine.id);
+      if (idx >= 0) {
+        textReplacements[idx] = replacement;
+      } else {
+        textReplacements.push(replacement);
+      }
+
+      // Live update canvas preview
+      liveDrawTextReplacement(replacement);
+
+      updateReplacementsListUI();
+      renderTextOverlay();
+      setStatus('success', 'TEXT CHANGE APPLIED ✓');
+    });
+  }
+
+  function liveDrawTextReplacement(rep) {
+    const ctx = mainCanvas.getContext('2d');
+    const b = rep.bbox;
+    const pad = rep.padding || 2;
+
+    // Mask original text with clean white
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(b.x - pad, b.y - pad, b.width + pad * 2, b.height + pad * 2);
+
+    // Draw replacement text
+    const fontFam = rep.fontFamily === 'Courier' ? 'monospace' :
+                    rep.fontFamily === 'TimesRoman' ? 'serif' : 'sans-serif';
+    ctx.font = `${rep.fontSize || 12}px ${fontFam}`;
+    ctx.fillStyle = textColor ? textColor.value : '#000000';
+    ctx.textBaseline = 'top';
+    ctx.fillText(rep.newText, b.x, b.y);
+  }
+
+  function updateReplacementsListUI() {
+    if (!replacementsContainer) return;
+    replacementsContainer.style.display = textReplacements.length > 0 ? 'flex' : 'none';
+    if (replacementCount) replacementCount.textContent = textReplacements.length;
+    if (!replacementsList) return;
+    replacementsList.innerHTML = '';
+
+    textReplacements.forEach((rep, index) => {
+      const row = document.createElement('div');
+      row.className = 'replacement-item';
+      row.innerHTML = `
+        <span class="replacement-text" title="${rep.originalText} → ${rep.newText}">"${rep.originalText}" → "<b>${rep.newText}</b>"</span>
+        <button type="button" class="btn-remove-replacement" title="Revert">&times;</button>
+      `;
+      row.querySelector('.btn-remove-replacement').addEventListener('click', () => {
+        textReplacements.splice(index, 1);
+        renderToMainCanvas(originalImage);
+        textReplacements.forEach(r => liveDrawTextReplacement(r));
+        updateReplacementsListUI();
+        renderTextOverlay();
+      });
+      replacementsList.appendChild(row);
+    });
+  }
+
+  if (btnCancelTextEdit) {
+    btnCancelTextEdit.addEventListener('click', () => {
+      selectedTextLine = null;
+      if (selectedTextOriginal) selectedTextOriginal.value = '';
+      if (selectedTextNew) selectedTextNew.value = '';
+      if (btnApplyTextEdit) btnApplyTextEdit.disabled = true;
+      renderTextOverlay();
+    });
+  }
+
+  if (btnDownloadTextPdf) {
+    btnDownloadTextPdf.addEventListener('click', async () => {
+      if (!loadedPdfBytes || textReplacements.length === 0) {
+        showError('No text changes to compile.');
+        return;
+      }
+
+      try {
+        setStatus('generating', 'COMPILING MODIFIED PDF...');
+        const canvasDims = {
+          width: originalImage.naturalWidth || originalImage.width,
+          height: originalImage.naturalHeight || originalImage.height
+        };
+
+        const modifiedBytes = await PDFTextProcessor.replaceTextOnPDF(
+          loadedPdfBytes,
+          pdfCurrentPage,
+          textReplacements,
+          canvasDims
+        );
+
+        const blob = new Blob([modifiedBytes], { type: 'application/pdf' });
+        const baseName = currentFile.name.replace(/\.pdf$/i, '');
+        const filename = QRGenerator.getEditedFilename(`${baseName}_text_edited`, 'pdf');
+        QRGenerator.triggerDownload(blob, filename);
+        setStatus('success', 'MODIFIED PDF DOWNLOADED ✓');
+      } catch (err) {
+        showError('PDF text compile error: ' + (err.message || 'Unknown error'));
+      }
+    });
+  }
 
   // Check for Handoff from Popup on Tab Load
   if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {

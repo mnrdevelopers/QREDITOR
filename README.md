@@ -13,6 +13,12 @@ A clean, professional, privacy-first Google Chrome Extension (Manifest V3) built
   - Seamless page navigation controls (`← Prev Page`, `Page X of Y`, `Next Page →`).
   - Lossless QR replacement directly inside the PDF using `pdf-lib` without rasterizing other pages or vector elements.
   - Download the modified document as a complete multi-page `.pdf` or export the edited page as a high-res `.png`.
+- **PDF Text Detection, OCR & In-Place Editing**:
+  - Automatically extract and cluster text lines from vector/digital PDF pages with exact bounding box coordinates and font metrics.
+  - Interactive clickable text overlay directly on the canvas viewport.
+  - Sidebar text editor with font selection (`Helvetica`, `Times Roman`, `Courier`), font size (pt), custom color picker, and background mask padding.
+  - Real-time live canvas preview of replaced text.
+  - Lossless PDF text replacement via `pdf-lib` vector text drawing with instant download.
 - **Multi-Pass & Deep QR Detection**: Automatic detection using `jsQR` with automated fallback enhancement passes (native Chromium BarcodeDetector, contrast stretching, unsharp mask sharpening, 2x/3x tile upscaling, and user-drawn ROI selection for tiny QR codes).
 - **Multiple QR Architecture**: Scans and indexes multiple QR codes on a single document or photo with quick selector tabs (`QR #1`, `QR #2`).
 - **Content Type Classification**: Automatically detects and categorizes QR payload types:
@@ -51,7 +57,8 @@ qr-editor-extension/
 ├── scanner/
 │   ├── qr-scanner.js          # QR detector, multi-pass preprocessing & tiled scanning
 │   ├── qr-generator.js        # QR generator, quiet zone, auto-verification & canvas replacer
-│   └── pdf-processor.js       # Client-side PDF page renderer & lossless PDF QR replacer
+│   ├── pdf-processor.js       # Client-side PDF page renderer & lossless PDF QR replacer
+│   └── pdf-text-processor.js  # PDF text extraction, clustering & in-place text replacer
 │
 ├── lib/
 │   ├── jsQR.js                # Vendored pure JS QR code decoder (offline)
