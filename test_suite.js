@@ -215,7 +215,12 @@ async function runTests() {
     const cropBox = { x: 1050, y: 750, width: 250, height: 250 };
     const roiResults = await QRScanner.scanRegion(img, cropBox);
     assert(roiResults.length === 1 && roiResults[0].data === 'https://crop-roi.org',
-      'TEST 11: Region scan (ROI) correctly decodes focused small QR');
+      'TEST 11a: Region scan (ROI) correctly decodes focused small QR');
+
+    // 11b: scanRegion boundary tolerance (must not throw binarizer error even on edge/odd bounds)
+    const oddCrop = { x: -20, y: -50, width: 300, height: 150 };
+    const oddResults = await QRScanner.scanRegion(img, oddCrop);
+    assert(Array.isArray(oddResults), 'TEST 11b: Region scan handles out-of-bounds cropbox safely without binarizer error');
   }
 
   // TEST 12: PDF Support & QR Replacement on PDF

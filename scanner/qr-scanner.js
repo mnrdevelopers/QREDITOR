@@ -185,11 +185,26 @@
   }
 
   function extractSubRegion(srcBuffer, srcW, x0, y0, subW, subH) {
-    const sub = new Uint8ClampedArray(subW * subH * 4);
-    for (let y = 0; y < subH; y++) {
-      const srcRow = ((y0 + y) * srcW + x0) * 4;
-      const dstRow = y * subW * 4;
-      sub.set(srcBuffer.subarray(srcRow, srcRow + subW * 4), dstRow);
+    const safeW = Math.max(1, Math.round(subW));
+    const safeH = Math.max(1, Math.round(subH));
+    const sub = new Uint8ClampedArray(safeW * safeH * 4);
+    sub.fill(255); // Default white background in case of edge clipping
+
+    if (!srcBuffer || srcBuffer.length === 0) return sub;
+
+    const totalPixels = (srcBuffer.length / 4) | 0;
+    const srcH = Math.max(1, (totalPixels / srcW) | 0);
+
+    for (let y = 0; y < safeH; y++) {
+      const sy = y0 + y;
+      if (sy < 0 || sy >= srcH) continue;
+      const copyW = Math.max(0, Math.min(safeW, srcW - x0));
+      if (copyW <= 0) continue;
+      const srcIdx = (sy * srcW + x0) * 4;
+      const dstIdx = y * safeW * 4;
+      if (srcIdx >= 0 && (srcIdx + copyW * 4) <= srcBuffer.length) {
+        sub.set(srcBuffer.subarray(srcIdx, srcIdx + copyW * 4), dstIdx);
+      }
     }
     return sub;
   }
@@ -435,36 +450,90 @@
    * Magnifies the selected region 2x or 3x for guaranteed small-QR decoding.
    */
   async function scanRegion(source, cropBox, options = {}) {
-    let width, height, rawData;
+    if (!source) throw new Error('No source provided to scanRegion.');
+    if (!cropBox) throw new Error('cropBox is required for scanRegion.');
 
-    if (typeof HTMLCanvasElement !== 'undefined' && source instanceof HTMLCanvasElement) {
-      width = source.width;
-      height = source.height;
-      const ctx = source.getContext('2d');
-      const imgData = ctx.getImageData(0, 0, width, height);
-      rawData = new Uint8ClampedArray(imgData.data);
-    } else if (typeof document !== 'undefined' && source instanceof (typeof HTMLImageElement !== 'undefined' ? HTMLImageElement : Object)) {
-      const canvas = document.createElement('canvas');
-      canvas.width = source.naturalWidth || source.width;
-      canvas.height = source.naturalHeight || source.height;
-      width = canvas.width;
-      height = canvas.height;
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(source, 0, 0);
-      const imgData = ctx.getImageData(0, 0, width, height);
-      rawData = new Uint8ClampedArray(imgData.data);
-    } else if (source && source.data) {
-      width = source.width;
-      height = source.height;
-      rawData = new Uint8ClampedArray(source.data);
+    const width = Math.max(10, Math.round(source.naturalWidth || source.width || 0));
+    const height = Math.max(10, Math.round(source.naturalHeight || source.height || 0));
+
+    let boxX = Math.round(Number(cropBox.x));
+    let boxY = Math.round(Number(cropBox.y));
+    let boxW = Math.round(Number(cropBox.width));
+    let boxH = Math.round(Number(cropBox.height));
+
+    if (isNaN(boxX)) boxX = 0;
+    if (isNaN(boxY)) boxY = 0;
+    if (isNaN(boxW) || boxW < 10) boxW = width;
+    if (isNaN(boxH) || boxH < 10) boxH = height;
+
+    const x0 = Math.max(0, Math.min(width - 10, boxX));
+    const y0 = Math.max(0, Math.min(height - 10, boxY));
+    const cropW = Math.max(10, Math.min(width - x0, boxW));
+    const cropH = Math.max(10, Math.min(height - y0, boxH));
+
+    let subData;
+
+    // In a browser DOM environment with an Image or Canvas, use canvas drawImage to extract pixels reliably
+    if (typeof document !== 'undefined' && (
+      (typeof HTMLCanvasElement !== 'undefined' && source instanceof HTMLCanvasElement) ||
+      (typeof HTMLImageElement !== 'undefined' && source instanceof HTMLImageElement)
+    )) {
+      const cropCanvas = document.createElement('canvas');
+      cropCanvas.width = cropW;
+      cropCanvas.height = cropH;
+      const cropCtx = cropCanvas.getContext('2d', { willReadFrequently: true });
+      cropCtx.drawImage(source, x0, y0, cropW, cropH, 0, 0, cropW, cropH);
+
+      // Try native BarcodeDetector on the crop canvas first if available
+      if (typeof global.BarcodeDetector !== 'undefined') {
+        try {
+          const detector = new global.BarcodeDetector({ formats: ['qr_code'] });
+          const barcodes = await detector.detect(cropCanvas);
+          if (barcodes && barcodes.length > 0 && barcodes[0].rawValue) {
+            const nb = barcodes[0];
+            const nbBox = nb.boundingBox || { x: 0, y: 0, width: cropW, height: cropH };
+            const finalX = Math.round(x0 + (nbBox.x || 0));
+            const finalY = Math.round(y0 + (nbBox.y || 0));
+            const finalW = Math.round(nbBox.width || cropW);
+            const finalH = Math.round(nbBox.height || cropH);
+
+            return [{
+              id: 1,
+              data: nb.rawValue,
+              x: finalX,
+              y: finalY,
+              width: finalW,
+              height: finalH,
+              type: detectContentType(nb.rawValue),
+              location: {
+                topLeftCorner: { x: finalX, y: finalY },
+                topRightCorner: { x: finalX + finalW, y: finalY },
+                bottomRightCorner: { x: finalX + finalW, y: finalY + finalH },
+                bottomLeftCorner: { x: finalX, y: finalY + finalH }
+              }
+            }];
+          }
+        } catch (e) {
+          // Fall through to jsQR
+        }
+      }
+
+      const imgData = cropCtx.getImageData(0, 0, cropW, cropH);
+      subData = new Uint8ClampedArray(imgData.data);
+    } else {
+      let rawData = source.data;
+      if (!rawData && typeof HTMLCanvasElement !== 'undefined' && source instanceof HTMLCanvasElement) {
+        const ctx = source.getContext('2d');
+        rawData = ctx.getImageData(0, 0, width, height).data;
+      }
+      subData = extractSubRegion(rawData, width, x0, y0, cropW, cropH);
     }
 
-    const x0 = Math.max(0, Math.min(width - 10, Math.round(cropBox.x)));
-    const y0 = Math.max(0, Math.min(height - 10, Math.round(cropBox.y)));
-    const cropW = Math.min(width - x0, Math.max(10, Math.round(cropBox.width)));
-    const cropH = Math.min(height - y0, Math.max(10, Math.round(cropBox.height)));
-
-    const subData = extractSubRegion(rawData, width, x0, y0, cropW, cropH);
+    // Safety check: verify subData buffer length
+    if (!subData || subData.length !== cropW * cropH * 4) {
+      subData = new Uint8ClampedArray(cropW * cropH * 4);
+      subData.fill(255);
+    }
 
     // Magnify the selected crop by 3x for small QR codes
     const upScale = 3;
@@ -485,6 +554,12 @@
       // Try contrast
       const contrast = enhanceContrast(upCrop.data, upCrop.width, upCrop.height);
       res = decoder(contrast, upCrop.width, upCrop.height, { inversionAttempts: 'attemptBoth' });
+    }
+
+    if (!res || !res.data) {
+      // Try inverted
+      const inverted = invertColors(upCrop.data, upCrop.width, upCrop.height);
+      res = decoder(inverted, upCrop.width, upCrop.height, { inversionAttempts: 'attemptBoth' });
     }
 
     if (res && res.data) {

@@ -400,13 +400,17 @@
 
   canvasContainer.addEventListener('mousedown', (e) => {
     if (!selectionActive) return;
-    const rect = canvasContainer.getBoundingClientRect();
-    startX = e.clientX - rect.left;
-    startY = e.clientY - rect.top;
+    const canvasRect = mainCanvas.getBoundingClientRect();
+    const contRect = canvasContainer.getBoundingClientRect();
+    const offX = canvasRect.left - contRect.left;
+    const offY = canvasRect.top - contRect.top;
+
+    startX = Math.max(0, Math.min(canvasRect.width, e.clientX - canvasRect.left));
+    startY = Math.max(0, Math.min(canvasRect.height, e.clientY - canvasRect.top));
     isSelecting = true;
 
-    selectionRect.style.left = `${startX}px`;
-    selectionRect.style.top = `${startY}px`;
+    selectionRect.style.left = `${Math.round(startX + offX)}px`;
+    selectionRect.style.top = `${Math.round(startY + offY)}px`;
     selectionRect.style.width = '0px';
     selectionRect.style.height = '0px';
     selectionRect.style.display = 'block';
@@ -414,19 +418,23 @@
 
   window.addEventListener('mousemove', (e) => {
     if (!isSelecting || !selectionActive) return;
-    const rect = canvasContainer.getBoundingClientRect();
-    const curX = Math.max(0, Math.min(rect.width, e.clientX - rect.left));
-    const curY = Math.max(0, Math.min(rect.height, e.clientY - rect.top));
+    const canvasRect = mainCanvas.getBoundingClientRect();
+    const contRect = canvasContainer.getBoundingClientRect();
+    const offX = canvasRect.left - contRect.left;
+    const offY = canvasRect.top - contRect.top;
 
-    const x = Math.min(startX, curX);
-    const y = Math.min(startY, curY);
-    const w = Math.abs(curX - startX);
-    const h = Math.abs(curY - startY);
+    const curX = Math.max(0, Math.min(canvasRect.width, e.clientX - canvasRect.left));
+    const curY = Math.max(0, Math.min(canvasRect.height, e.clientY - canvasRect.top));
 
-    selectionRect.style.left = `${x}px`;
-    selectionRect.style.top = `${y}px`;
-    selectionRect.style.width = `${w}px`;
-    selectionRect.style.height = `${h}px`;
+    const boxLeft = Math.min(startX, curX);
+    const boxTop = Math.min(startY, curY);
+    const boxW = Math.abs(curX - startX);
+    const boxH = Math.abs(curY - startY);
+
+    selectionRect.style.left = `${Math.round(boxLeft + offX)}px`;
+    selectionRect.style.top = `${Math.round(boxTop + offY)}px`;
+    selectionRect.style.width = `${Math.round(boxW)}px`;
+    selectionRect.style.height = `${Math.round(boxH)}px`;
   });
 
   window.addEventListener('mouseup', async (e) => {
@@ -436,25 +444,37 @@
     btnSelectArea.classList.remove('active-tool');
     canvasContainer.classList.remove('selecting');
 
-    const selW = parseInt(selectionRect.style.width, 10) || 0;
-    const selH = parseInt(selectionRect.style.height, 10) || 0;
-    const selX = parseInt(selectionRect.style.left, 10) || 0;
-    const selY = parseInt(selectionRect.style.top, 10) || 0;
+    const canvasRect = mainCanvas.getBoundingClientRect();
+    const curX = Math.max(0, Math.min(canvasRect.width, e.clientX - canvasRect.left));
+    const curY = Math.max(0, Math.min(canvasRect.height, e.clientY - canvasRect.top));
+
+    const boxLeft = Math.min(startX, curX);
+    const boxTop = Math.min(startY, curY);
+    const boxW = Math.abs(curX - startX);
+    const boxH = Math.abs(curY - startY);
+
     selectionRect.style.display = 'none';
 
-    if (selW < 8 || selH < 8) return;
+    if (boxW < 6 || boxH < 6) return;
 
     hideError();
     setStatus('scanning', 'MAGNIFYING & SCANNING SELECTION...');
     valStatus.textContent = 'Scanning selection...';
 
-    // Map screen display coordinates back to high-res native image coordinates
-    const scaleFactor = originalImage.naturalWidth / parseInt(mainCanvas.style.width, 10);
+    // Safely map screen display coordinates back to high-res native image/PDF coordinates
+    const origW = originalImage.naturalWidth || originalImage.width || mainCanvas.width;
+    const origH = originalImage.naturalHeight || originalImage.height || mainCanvas.height;
+    const dispW = canvasRect.width || parseFloat(mainCanvas.style.width) || origW;
+    const dispH = canvasRect.height || parseFloat(mainCanvas.style.height) || origH;
+
+    const scaleX = origW / Math.max(1, dispW);
+    const scaleY = origH / Math.max(1, dispH);
+
     const cropBox = {
-      x: selX * scaleFactor,
-      y: selY * scaleFactor,
-      width: selW * scaleFactor,
-      height: selH * scaleFactor
+      x: Math.round(boxLeft * scaleX),
+      y: Math.round(boxTop * scaleY),
+      width: Math.round(boxW * scaleX),
+      height: Math.round(boxH * scaleY)
     };
 
     try {
@@ -470,7 +490,7 @@
         showError('Could not decode a QR code in the selected area. Try zooming in and selecting closely around the QR code.');
       }
     } catch (err) {
-      showError('Selection scan error: ' + err.message);
+      showError('Selection scan error: ' + (err.message || 'Unable to decode selected region'));
     }
   });
 
