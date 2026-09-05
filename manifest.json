@@ -18,6 +18,16 @@
     }
   },
   "permissions": [
-    "storage"
+    "storage",
+    "tabs"
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["index.html", "pdf-editor.html", "pdf-editor.js", "pdf-editor.css",
+                    "editor.html", "editor.js", "editor.css",
+                    "scanner/text-editor-engine.js",
+                    "lib/*", "scanner/*"],
+      "matches": ["<all_urls>"]
+    }
   ]
 }

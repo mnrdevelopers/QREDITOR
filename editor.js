@@ -749,7 +749,7 @@
         newText,
         currentQR.width,
         currentQR.height,
-        { errorCorrectionLevel: ecLevel, marginModules: 4 }
+        { errorCorrectionLevel: ecLevel, marginModules: 0 }
       );
 
       // Verification step
@@ -990,7 +990,59 @@
 
   btnStartOver.addEventListener('click', resetAll);
 
-  // Check for Handoff from Popup on Tab Load
+  // ─── Navigation & Cross-Tool Handoff ─────────────────────────────────────────
+  const btnOpenPdfEditor = document.getElementById('btnOpenPdfEditor');
+  const appLogo = document.getElementById('appLogo');
+
+  if (appLogo) {
+    appLogo.addEventListener('click', () => {
+      if (typeof chrome !== 'undefined' && chrome.tabs && chrome.tabs.create) {
+        chrome.tabs.create({ url: chrome.runtime.getURL('index.html') });
+      } else {
+        window.location.href = 'index.html';
+      }
+    });
+  }
+
+  if (btnOpenPdfEditor) {
+    btnOpenPdfEditor.addEventListener('click', () => {
+      // If a PDF is currently loaded in the QR editor, hand off bytes to pdf-editor
+      if (isPdfMode && loadedPdfBytes) {
+        try {
+          let binary = '';
+          const chunkSize = 8192;
+          for (let i = 0; i < loadedPdfBytes.length; i += chunkSize) {
+            binary += String.fromCharCode(...loadedPdfBytes.subarray(i, i + chunkSize));
+          }
+          const b64 = btoa(binary);
+          const pdfName = (currentFile && currentFile.name) || 'document.pdf';
+
+          if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+            chrome.storage.local.set({
+              pdfEditorHandoff: { data: b64, name: pdfName }
+            }, () => {
+              chrome.tabs.create({ url: chrome.runtime.getURL('pdf-editor.html') });
+            });
+            return;
+          } else {
+            try {
+              sessionStorage.setItem('pdfEditorHandoff', JSON.stringify({ data: b64, name: pdfName }));
+            } catch (_) {}
+            window.location.href = 'pdf-editor.html';
+            return;
+          }
+        } catch (_) { /* fallback to plain open */ }
+      }
+
+      if (typeof chrome !== 'undefined' && chrome.tabs && chrome.tabs.create) {
+        chrome.tabs.create({ url: chrome.runtime.getURL('pdf-editor.html') });
+      } else {
+        window.location.href = 'pdf-editor.html';
+      }
+    });
+  }
+
+  // Check for Handoff from Popup/Index on Tab Load
   if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
     chrome.storage.local.get(['handoffImage', 'handoffQRs'], (res) => {
       if (res && res.handoffImage) {
@@ -1008,8 +1060,33 @@
           initializeWorkspace();
         };
         img.src = item.dataUrl;
+      } else {
+        checkSessionStorageHandoff();
       }
     });
+  } else {
+    checkSessionStorageHandoff();
+  }
+
+  function checkSessionStorageHandoff() {
+    try {
+      const raw = sessionStorage.getItem('handoffImage');
+      if (raw) {
+        sessionStorage.removeItem('handoffImage');
+        const item = JSON.parse(raw);
+        const img = new Image();
+        img.onload = () => {
+          originalImage = img;
+          currentFile = {
+            name: item.filename || 'image.png',
+            size: item.size || 0,
+            type: item.type || 'image/png'
+          };
+          initializeWorkspace();
+        };
+        img.src = item.dataUrl;
+      }
+    } catch (_) {}
   }
 
 })();

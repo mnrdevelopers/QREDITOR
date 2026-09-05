@@ -3,13 +3,1079 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="refresh" content="0; url=editor.html">
-  <title>QR Code Editor & Replacer</title>
-  <script>
-    window.location.replace("editor.html");
-  </script>
+  <title>QR Studio &amp; PDF Suite — Workspace Hub</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-app: #090d16;
+      --bg-topbar: rgba(13, 18, 30, 0.85);
+      --bg-card: rgba(21, 29, 48, 0.65);
+      --bg-card-hover: rgba(28, 39, 66, 0.85);
+      --bg-dropzone: rgba(15, 23, 42, 0.55);
+      
+      --text-bright: #ffffff;
+      --text-main: #e2e8f0;
+      --text-muted: #94a3b8;
+      --text-dim: #64748b;
+
+      --primary: #6366f1;
+      --primary-hover: #4f46e5;
+      --primary-glow: 0 0 25px rgba(99, 102, 241, 0.35);
+
+      --cyan: #06b6d4;
+      --cyan-hover: #0891b2;
+      --cyan-glow: 0 0 25px rgba(6, 182, 212, 0.35);
+
+      --emerald: #10b981;
+      --border: rgba(255, 255, 255, 0.08);
+      --border-hover: rgba(255, 255, 255, 0.2);
+
+      --radius-sm: 8px;
+      --radius-md: 14px;
+      --radius-lg: 20px;
+      --radius-full: 9999px;
+
+      --font: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: var(--font);
+      background-color: var(--bg-app);
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+      position: relative;
+    }
+
+    /* Ambient glow meshes */
+    .bg-glow-1 {
+      position: fixed;
+      top: -120px;
+      left: 15%;
+      width: 500px;
+      height: 500px;
+      background: radial-gradient(circle, rgba(99, 102, 241, 0.15) 0%, transparent 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .bg-glow-2 {
+      position: fixed;
+      top: 10%;
+      right: 15%;
+      width: 500px;
+      height: 500px;
+      background: radial-gradient(circle, rgba(6, 182, 212, 0.12) 0%, transparent 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* Top Navigation */
+    .hub-header {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      background: var(--bg-topbar);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--border);
+      padding: 0.85rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .hub-brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      text-decoration: none;
+      color: inherit;
+    }
+
+    .brand-icon-box {
+      width: 38px;
+      height: 38px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, #6366f1 0%, #06b6d4 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 14px rgba(99, 102, 241, 0.35);
+      color: #fff;
+    }
+
+    .brand-titles {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .brand-name {
+      font-size: 1.05rem;
+      font-weight: 800;
+      letter-spacing: 0.03em;
+      color: var(--text-bright);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .brand-name span {
+      background: linear-gradient(135deg, #6366f1 0%, #06b6d4 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .brand-sub {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      font-weight: 500;
+      letter-spacing: 0.02em;
+    }
+
+    .hub-top-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 4px 10px;
+      border-radius: var(--radius-full);
+      background: rgba(16, 185, 129, 0.12);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      color: #10b981;
+    }
+
+    .status-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #10b981;
+      box-shadow: 0 0 8px #10b981;
+    }
+
+    .nav-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 7px 14px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      border-radius: var(--radius-sm);
+      text-decoration: none;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .nav-btn-pdf {
+      background: rgba(6, 182, 212, 0.12);
+      border: 1px solid rgba(6, 182, 212, 0.35);
+      color: #06b6d4;
+    }
+
+    .nav-btn-pdf:hover {
+      background: rgba(6, 182, 212, 0.22);
+      border-color: #06b6d4;
+      box-shadow: var(--cyan-glow);
+      transform: translateY(-1px);
+    }
+
+    .nav-btn-qr {
+      background: rgba(99, 102, 241, 0.12);
+      border: 1px solid rgba(99, 102, 241, 0.35);
+      color: #818cf8;
+    }
+
+    .nav-btn-qr:hover {
+      background: rgba(99, 102, 241, 0.22);
+      border-color: #6366f1;
+      box-shadow: var(--primary-glow);
+      transform: translateY(-1px);
+    }
+
+    /* Main Container */
+    .hub-container {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 3rem 1.5rem 4rem;
+      position: relative;
+      z-index: 10;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    /* Hero Section */
+    .hero-section {
+      text-align: center;
+      margin-bottom: 2.8rem;
+    }
+
+    .hero-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: 5px 14px;
+      border-radius: var(--radius-full);
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: #cbd5e1;
+      margin-bottom: 1.2rem;
+    }
+
+    .hero-title {
+      font-size: 2.6rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      color: var(--text-bright);
+      line-height: 1.15;
+      margin-bottom: 0.8rem;
+    }
+
+    .hero-title .gradient-text {
+      background: linear-gradient(135deg, #a5b4fc 0%, #38bdf8 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .hero-subtitle {
+      font-size: 1.05rem;
+      color: var(--text-muted);
+      max-width: 640px;
+      margin: 0 auto;
+      line-height: 1.6;
+    }
+
+    /* Cards Grid */
+    .workspace-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(440px, 1fr));
+      gap: 2rem;
+      width: 100%;
+      margin-bottom: 2.8rem;
+    }
+
+    @media (max-width: 960px) {
+      .workspace-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .workspace-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 2.2rem;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      overflow: hidden;
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .workspace-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      opacity: 0.8;
+      transition: opacity 0.3s ease;
+    }
+
+    .card-pdf::before {
+      background: linear-gradient(90deg, #06b6d4, #3b82f6);
+    }
+
+    .card-qr::before {
+      background: linear-gradient(90deg, #6366f1, #d946ef);
+    }
+
+    .workspace-card:hover {
+      background: var(--bg-card-hover);
+      transform: translateY(-4px);
+    }
+
+    .card-pdf:hover {
+      border-color: rgba(6, 182, 212, 0.45);
+      box-shadow: 0 16px 36px rgba(6, 182, 212, 0.15);
+    }
+
+    .card-qr:hover {
+      border-color: rgba(99, 102, 241, 0.45);
+      box-shadow: 0 16px 36px rgba(99, 102, 241, 0.15);
+    }
+
+    .card-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1.4rem;
+    }
+
+    .card-icon-box {
+      width: 52px;
+      height: 52px;
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .card-pdf .card-icon-box {
+      background: rgba(6, 182, 212, 0.15);
+      color: #06b6d4;
+      border: 1px solid rgba(6, 182, 212, 0.3);
+    }
+
+    .card-qr .card-icon-box {
+      background: rgba(99, 102, 241, 0.15);
+      color: #818cf8;
+      border: 1px solid rgba(99, 102, 241, 0.3);
+    }
+
+    .card-badge {
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      padding: 4px 10px;
+      border-radius: var(--radius-full);
+    }
+
+    .badge-cyan {
+      background: rgba(6, 182, 212, 0.12);
+      border: 1px solid rgba(6, 182, 212, 0.3);
+      color: #06b6d4;
+    }
+
+    .badge-indigo {
+      background: rgba(99, 102, 241, 0.12);
+      border: 1px solid rgba(99, 102, 241, 0.3);
+      color: #a5b4fc;
+    }
+
+    .card-title {
+      font-size: 1.45rem;
+      font-weight: 700;
+      color: var(--text-bright);
+      margin-bottom: 0.6rem;
+    }
+
+    .card-desc {
+      font-size: 0.9rem;
+      color: var(--text-muted);
+      line-height: 1.6;
+      margin-bottom: 1.5rem;
+      flex: 1;
+    }
+
+    .feature-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-bottom: 2rem;
+      padding-top: 1.2rem;
+      border-top: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .feature-item {
+      font-size: 0.85rem;
+      color: #cbd5e1;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .feature-check {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.72rem;
+      font-weight: 800;
+      flex-shrink: 0;
+    }
+
+    .card-pdf .feature-check {
+      background: rgba(6, 182, 212, 0.18);
+      color: #06b6d4;
+    }
+
+    .card-qr .feature-check {
+      background: rgba(99, 102, 241, 0.18);
+      color: #818cf8;
+    }
+
+    .card-actions {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .btn-main {
+      flex: 1;
+      padding: 12px 20px;
+      border-radius: var(--radius-md);
+      font-size: 0.92rem;
+      font-weight: 700;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      text-decoration: none;
+      border: none;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .btn-main-pdf {
+      background: linear-gradient(135deg, #06b6d4 0%, #0284c7 100%);
+      color: #ffffff;
+      box-shadow: 0 4px 16px rgba(6, 182, 212, 0.35);
+    }
+
+    .btn-main-pdf:hover {
+      box-shadow: 0 6px 24px rgba(6, 182, 212, 0.55);
+      transform: translateY(-2px);
+    }
+
+    .btn-main-qr {
+      background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+      color: #ffffff;
+      box-shadow: 0 4px 16px rgba(99, 102, 241, 0.35);
+    }
+
+    .btn-main-qr:hover {
+      box-shadow: 0 6px 24px rgba(99, 102, 241, 0.55);
+      transform: translateY(-2px);
+    }
+
+    .btn-file-select {
+      padding: 12px 16px;
+      border-radius: var(--radius-md);
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border);
+      color: var(--text-main);
+      font-size: 0.88rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s ease;
+    }
+
+    .btn-file-select:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: var(--border-hover);
+      color: var(--text-bright);
+    }
+
+    /* Universal Drop Zone */
+    .universal-dropzone {
+      width: 100%;
+      background: var(--bg-dropzone);
+      border: 2px dashed rgba(255, 255, 255, 0.15);
+      border-radius: var(--radius-lg);
+      padding: 2.5rem 1.5rem;
+      text-align: center;
+      cursor: pointer;
+      position: relative;
+      transition: all 0.25s ease;
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+    }
+
+    .universal-dropzone:hover,
+    .universal-dropzone.drag-over {
+      border-color: #38bdf8;
+      background: rgba(6, 182, 212, 0.08);
+      box-shadow: 0 0 30px rgba(6, 182, 212, 0.2);
+    }
+
+    .dropzone-icon {
+      width: 48px;
+      height: 48px;
+      margin: 0 auto 1rem;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.05);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #38bdf8;
+    }
+
+    .dropzone-title {
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: var(--text-bright);
+      margin-bottom: 0.4rem;
+    }
+
+    .dropzone-hint {
+      font-size: 0.84rem;
+      color: var(--text-muted);
+    }
+
+    /* Hidden inputs */
+    .file-input-hidden {
+      display: none;
+    }
+
+    /* Modal for PDF routing selection */
+    .routing-modal-backdrop {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.75);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+
+    .routing-modal-backdrop.show {
+      display: flex;
+    }
+
+    .routing-modal {
+      background: #0f172a;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: var(--radius-lg);
+      padding: 2rem;
+      max-width: 480px;
+      width: 90%;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+      text-align: center;
+    }
+
+    .routing-modal-title {
+      font-size: 1.3rem;
+      font-weight: 800;
+      color: var(--text-bright);
+      margin-bottom: 0.5rem;
+    }
+
+    .routing-modal-desc {
+      font-size: 0.88rem;
+      color: var(--text-muted);
+      margin-bottom: 1.8rem;
+    }
+
+    .routing-modal-choices {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .routing-btn {
+      padding: 14px 18px;
+      border-radius: var(--radius-md);
+      font-size: 0.95rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border: 1px solid transparent;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .routing-btn-pdf {
+      background: rgba(6, 182, 212, 0.15);
+      border-color: rgba(6, 182, 212, 0.4);
+      color: #38bdf8;
+    }
+
+    .routing-btn-pdf:hover {
+      background: rgba(6, 182, 212, 0.25);
+      box-shadow: var(--cyan-glow);
+    }
+
+    .routing-btn-qr {
+      background: rgba(99, 102, 241, 0.15);
+      border-color: rgba(99, 102, 241, 0.4);
+      color: #a5b4fc;
+    }
+
+    .routing-btn-qr:hover {
+      background: rgba(99, 102, 241, 0.25);
+      box-shadow: var(--primary-glow);
+    }
+
+    .routing-cancel {
+      margin-top: 1rem;
+      background: transparent;
+      border: none;
+      color: var(--text-dim);
+      font-size: 0.82rem;
+      cursor: pointer;
+    }
+
+    .routing-cancel:hover {
+      color: var(--text-main);
+    }
+
+    /* Footer */
+    .hub-footer {
+      border-top: 1px solid var(--border);
+      padding: 1.5rem 2rem;
+      text-align: center;
+      font-size: 0.8rem;
+      color: var(--text-dim);
+      background: rgba(13, 18, 30, 0.5);
+    }
+  </style>
 </head>
-<body style="font-family: sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #0f172a; color: #cbd5e1;">
-  <p>Loading <a href="editor.html" style="color: #6366f1; text-decoration: underline;">QR Code Editor & Replacer Workspace</a>...</p>
+<body>
+  <div class="bg-glow-1"></div>
+  <div class="bg-glow-2"></div>
+
+  <!-- Top Navigation Bar -->
+  <header class="hub-header">
+    <a href="index.html" class="hub-brand">
+      <div class="brand-icon-box">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+          <rect x="3" y="3" width="7" height="7"></rect>
+          <rect x="14" y="3" width="7" height="7"></rect>
+          <rect x="14" y="14" width="7" height="7"></rect>
+          <rect x="3" y="14" width="7" height="7"></rect>
+          <line x1="7" y1="7" x2="7.01" y2="7"></line>
+          <line x1="17" y1="7" x2="17.01" y2="7"></line>
+          <line x1="7" y1="17" x2="7.01" y2="17"></line>
+        </svg>
+      </div>
+      <div class="brand-titles">
+        <div class="brand-name">QR STUDIO <span>&amp; PDF SUITE</span></div>
+        <div class="brand-sub">Client-Side Engine · Zero Uploads</div>
+      </div>
+    </a>
+
+    <div class="hub-top-actions">
+      <div class="status-badge">
+        <span class="status-dot"></span>
+        <span>READY</span>
+      </div>
+      <a href="pdf-editor.html" class="nav-btn nav-btn-pdf" id="topNavPdfBtn" title="Launch PDF Text &amp; QR Editor">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="4 7 4 4 20 4 20 7"></polyline>
+          <line x1="9" y1="20" x2="15" y2="20"></line>
+          <line x1="12" y1="4" x2="12" y2="20"></line>
+        </svg>
+        <span>PDF Editor</span>
+      </a>
+      <a href="editor.html" class="nav-btn nav-btn-qr" id="topNavQrBtn" title="Launch QR Studio &amp; Replacer">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+          <polyline points="15 3 21 3 21 9"></polyline>
+          <line x1="10" y1="14" x2="21" y2="3"></line>
+        </svg>
+        <span>QR Studio</span>
+      </a>
+    </div>
+  </header>
+
+  <!-- Hub Main Content -->
+  <main class="hub-container">
+    <div class="hero-section">
+      <div class="hero-pill">✦ All-in-One Client-Side Workspace</div>
+      <h1 class="hero-title">Choose Your <span class="gradient-text">Workspace</span></h1>
+      <p class="hero-subtitle">High-precision QR detection, exact replacement, and interactive in-place PDF text editing. 100% private in your browser.</p>
+    </div>
+
+    <!-- Workspace Launch Cards -->
+    <div class="workspace-grid">
+      <!-- Card 1: PDF Text & QR Editor -->
+      <div class="workspace-card card-pdf">
+        <div class="card-top">
+          <div class="card-icon-box">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="4 7 4 4 20 4 20 7"></polyline>
+              <line x1="9" y1="20" x2="15" y2="20"></line>
+              <line x1="12" y1="4" x2="12" y2="20"></line>
+            </svg>
+          </div>
+          <span class="card-badge badge-cyan">Visual In-Place Editor</span>
+        </div>
+        <h2 class="card-title">PDF Text &amp; QR Editor</h2>
+        <p class="card-desc">Edit existing text directly inside your PDF pages, customize fonts, sizes, and colors, and replace embedded QR codes with exact pixel dimensions.</p>
+
+        <ul class="feature-list">
+          <li class="feature-item">
+            <span class="feature-check">✓</span>
+            <span>Click-to-edit inline text like a word processor</span>
+          </li>
+          <li class="feature-item">
+            <span class="feature-check">✓</span>
+            <span>Native Indian Rupee (₹) and currency glyph fidelity</span>
+          </li>
+          <li class="feature-item">
+            <span class="feature-check">✓</span>
+            <span>Interactive multi-page navigator &amp; zoom</span>
+          </li>
+          <li class="feature-item">
+            <span class="feature-check">✓</span>
+            <span>Safe QR replacement with zero text wiping</span>
+          </li>
+        </ul>
+
+        <div class="card-actions">
+          <button class="btn-main btn-main-pdf" id="btnLaunchPdfEditor">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+              <polyline points="15 3 21 3 21 9"></polyline>
+              <line x1="10" y1="14" x2="21" y2="3"></line>
+            </svg>
+            Open PDF Editor
+          </button>
+          <button class="btn-file-select" id="btnSelectPdfFile" title="Pick a PDF file to open immediately">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="17 8 12 3 7 8"></polyline>
+              <line x1="12" y1="3" x2="12" y2="15"></line>
+            </svg>
+            Choose PDF
+          </button>
+          <input type="file" id="pdfCardInput" accept="application/pdf,.pdf" class="file-input-hidden">
+        </div>
+      </div>
+
+      <!-- Card 2: QR Studio & Replacer -->
+      <div class="workspace-card card-qr">
+        <div class="card-top">
+          <div class="card-icon-box">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="3" width="7" height="7"></rect>
+              <rect x="14" y="3" width="7" height="7"></rect>
+              <rect x="14" y="14" width="7" height="7"></rect>
+              <rect x="3" y="14" width="7" height="7"></rect>
+              <line x1="7" y1="7" x2="7.01" y2="7"></line>
+              <line x1="17" y1="7" x2="17.01" y2="7"></line>
+              <line x1="7" y1="17" x2="7.01" y2="17"></line>
+            </svg>
+          </div>
+          <span class="card-badge badge-indigo">Matrix QR Engine</span>
+        </div>
+        <h2 class="card-title">QR Studio &amp; Replacer</h2>
+        <p class="card-desc">High-precision multi-pass scanner and regenerator for images and documents. Replaces detected QR codes with 1:1 pixel footprint matching.</p>
+
+        <ul class="feature-list">
+          <li class="feature-item">
+            <span class="feature-check">✓</span>
+            <span>Multi-pass deep detection (BarcodeDetector + jsQR)</span>
+          </li>
+          <li class="feature-item">
+            <span class="feature-check">✓</span>
+            <span>Exact pixel-dimension replacement matching native size</span>
+          </li>
+          <li class="feature-item">
+            <span class="feature-check">✓</span>
+            <span>Side-by-side comparison &amp; automated verification</span>
+          </li>
+          <li class="feature-item">
+            <span class="feature-check">✓</span>
+            <span>Supports high-res PNG, JPG, WEBP &amp; PDFs</span>
+          </li>
+        </ul>
+
+        <div class="card-actions">
+          <button class="btn-main btn-main-qr" id="btnLaunchQrStudio">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+              <polyline points="15 3 21 3 21 9"></polyline>
+              <line x1="10" y1="14" x2="21" y2="3"></line>
+            </svg>
+            Open QR Studio
+          </button>
+          <button class="btn-file-select" id="btnSelectQrFile" title="Pick an image or document">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="17 8 12 3 7 8"></polyline>
+              <line x1="12" y1="3" x2="12" y2="15"></line>
+            </svg>
+            Choose File
+          </button>
+          <input type="file" id="qrCardInput" accept="image/jpeg,image/png,image/webp,image/jpg,application/pdf,.pdf" class="file-input-hidden">
+        </div>
+      </div>
+    </div>
+
+    <!-- Universal Drop Zone -->
+    <div class="universal-dropzone" id="universalDropZone">
+      <div class="dropzone-icon">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+          <polyline points="17 8 12 3 7 8"></polyline>
+          <line x1="12" y1="3" x2="12" y2="15"></line>
+        </svg>
+      </div>
+      <div class="dropzone-title">Drag &amp; drop any document or image here</div>
+      <div class="dropzone-hint">PDF • PNG • JPG • WEBP — Automatically routed to the optimal editor</div>
+      <input type="file" id="universalFileInput" accept="image/jpeg,image/png,image/webp,image/jpg,application/pdf,.pdf" class="file-input-hidden">
+    </div>
+  </main>
+
+  <!-- PDF Choice Modal -->
+  <div class="routing-modal-backdrop" id="routingModal">
+    <div class="routing-modal">
+      <h3 class="routing-modal-title">Open PDF Document</h3>
+      <p class="routing-modal-desc" id="routingFileName">How would you like to open this file?</p>
+      <div class="routing-modal-choices">
+        <button class="routing-btn routing-btn-pdf" id="modalChoosePdfEditor">
+          <span>Open in PDF Text Editor (Recommended)</span>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="9 18 15 12 9 6"></polyline>
+          </svg>
+        </button>
+        <button class="routing-btn routing-btn-qr" id="modalChooseQrStudio">
+          <span>Open in QR Studio &amp; Replacer</span>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="9 18 15 12 9 6"></polyline>
+          </svg>
+        </button>
+      </div>
+      <button class="routing-cancel" id="modalCancel">Cancel</button>
+    </div>
+  </div>
+
+  <footer class="hub-footer">
+    <span>QR Studio &amp; PDF Suite · 100% Client-Side In-Memory Execution · No Server Telemetry</span>
+  </footer>
+
+  <script>
+    (function() {
+      'use strict';
+
+      let pendingPdfFile = null;
+
+      // DOM Elements
+      const btnLaunchPdfEditor = document.getElementById('btnLaunchPdfEditor');
+      const btnLaunchQrStudio = document.getElementById('btnLaunchQrStudio');
+      const topNavPdfBtn = document.getElementById('topNavPdfBtn');
+      const topNavQrBtn = document.getElementById('topNavQrBtn');
+
+      const btnSelectPdfFile = document.getElementById('btnSelectPdfFile');
+      const pdfCardInput = document.getElementById('pdfCardInput');
+
+      const btnSelectQrFile = document.getElementById('btnSelectQrFile');
+      const qrCardInput = document.getElementById('qrCardInput');
+
+      const universalDropZone = document.getElementById('universalDropZone');
+      const universalFileInput = document.getElementById('universalFileInput');
+
+      const routingModal = document.getElementById('routingModal');
+      const routingFileName = document.getElementById('routingFileName');
+      const modalChoosePdfEditor = document.getElementById('modalChoosePdfEditor');
+      const modalChooseQrStudio = document.getElementById('modalChooseQrStudio');
+      const modalCancel = document.getElementById('modalCancel');
+
+      // Navigation Helper
+      function openPage(url) {
+        if (typeof chrome !== 'undefined' && chrome.tabs && chrome.tabs.create) {
+          chrome.tabs.create({ url: chrome.runtime.getURL(url) });
+        } else {
+          window.location.href = url;
+        }
+      }
+
+      // Direct workspace launches
+      btnLaunchPdfEditor.addEventListener('click', () => openPage('pdf-editor.html'));
+      btnLaunchQrStudio.addEventListener('click', () => openPage('editor.html'));
+      topNavPdfBtn.addEventListener('click', (e) => {
+        if (typeof chrome !== 'undefined' && chrome.tabs && chrome.tabs.create) {
+          e.preventDefault();
+          openPage('pdf-editor.html');
+        }
+      });
+      topNavQrBtn.addEventListener('click', (e) => {
+        if (typeof chrome !== 'undefined' && chrome.tabs && chrome.tabs.create) {
+          e.preventDefault();
+          openPage('editor.html');
+        }
+      });
+
+      // PDF Card file picker
+      btnSelectPdfFile.addEventListener('click', () => pdfCardInput.click());
+      pdfCardInput.addEventListener('change', (e) => {
+        const file = e.target.files && e.target.files[0];
+        if (file) handoffToPdfEditor(file);
+      });
+
+      // QR Card file picker
+      btnSelectQrFile.addEventListener('click', () => qrCardInput.click());
+      qrCardInput.addEventListener('change', (e) => {
+        const file = e.target.files && e.target.files[0];
+        if (file) routeFile(file);
+      });
+
+      // Universal Dropzone click
+      universalDropZone.addEventListener('click', () => universalFileInput.click());
+      universalFileInput.addEventListener('change', (e) => {
+        const file = e.target.files && e.target.files[0];
+        if (file) routeFile(file);
+      });
+
+      // Drag & Drop
+      ['dragenter', 'dragover'].forEach(eventName => {
+        universalDropZone.addEventListener(eventName, (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          universalDropZone.classList.add('drag-over');
+        });
+      });
+
+      ['dragleave', 'drop'].forEach(eventName => {
+        universalDropZone.addEventListener(eventName, (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          universalDropZone.classList.remove('drag-over');
+        });
+      });
+
+      universalDropZone.addEventListener('drop', (e) => {
+        const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+        if (file) routeFile(file);
+      });
+
+      // File Routing
+      function routeFile(file) {
+        const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+        if (isPdf) {
+          pendingPdfFile = file;
+          routingFileName.textContent = `"${file.name}" can be opened in either workspace:`;
+          routingModal.classList.add('show');
+        } else {
+          // It's an image → handoff to QR Studio
+          handoffToQrStudio(file);
+        }
+      }
+
+      // Modal Handlers
+      modalCancel.addEventListener('click', () => {
+        pendingPdfFile = null;
+        routingModal.classList.remove('show');
+      });
+
+      modalChoosePdfEditor.addEventListener('click', () => {
+        if (pendingPdfFile) {
+          const f = pendingPdfFile;
+          pendingPdfFile = null;
+          routingModal.classList.remove('show');
+          handoffToPdfEditor(f);
+        }
+      });
+
+      modalChooseQrStudio.addEventListener('click', () => {
+        if (pendingPdfFile) {
+          const f = pendingPdfFile;
+          pendingPdfFile = null;
+          routingModal.classList.remove('show');
+          handoffToQrStudio(f);
+        }
+      });
+
+      // PDF Editor Handoff
+      function handoffToPdfEditor(file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          const ab = e.target.result;
+          if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+            const uint8 = new Uint8Array(ab);
+            let binary = '';
+            const chunkSize = 8192;
+            for (let i = 0; i < uint8.length; i += chunkSize) {
+              binary += String.fromCharCode(...uint8.subarray(i, i + chunkSize));
+            }
+            const b64 = btoa(binary);
+            chrome.storage.local.set({
+              pdfEditorHandoff: { data: b64, name: file.name }
+            }, () => {
+              openPage('pdf-editor.html');
+            });
+          } else {
+            // Local web fallback: store in sessionStorage if small or direct open
+            try {
+              const uint8 = new Uint8Array(ab);
+              let binary = '';
+              const chunkSize = 8192;
+              for (let i = 0; i < uint8.length; i += chunkSize) {
+                binary += String.fromCharCode(...uint8.subarray(i, i + chunkSize));
+              }
+              sessionStorage.setItem('pdfEditorHandoff', JSON.stringify({ data: btoa(binary), name: file.name }));
+            } catch (_) {}
+            openPage('pdf-editor.html');
+          }
+        };
+        reader.readAsArrayBuffer(file);
+      }
+
+      // QR Studio Handoff
+      function handoffToQrStudio(file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          const dataUrl = e.target.result;
+          if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+            chrome.storage.local.set({
+              handoffImage: {
+                dataUrl: dataUrl,
+                filename: file.name,
+                size: file.size,
+                type: file.type
+              }
+            }, () => {
+              openPage('editor.html');
+            });
+          } else {
+            try {
+              sessionStorage.setItem('handoffImage', JSON.stringify({
+                dataUrl: dataUrl,
+                filename: file.name,
+                size: file.size,
+                type: file.type
+              }));
+            } catch (_) {}
+            openPage('editor.html');
+          }
+        };
+        reader.readAsDataURL(file);
+      }
+
+    })();
+  </script>
 </body>
 </html>

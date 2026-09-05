@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PDF Text &amp; QR Editor — QR Studio</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="pdf-editor.css">
+</head>
+<body>
+<div class="pe-shell">
+
+  <!-- ─── Top Bar ─────────────────────────────────────────────────────────── -->
+  <header class="pe-topbar">
+    <div class="pe-logo" id="peLogo" title="Back to Workspace Hub (index.html)" style="cursor: pointer;">
+      <div class="pe-logo-icon">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+          <rect x="3" y="3" width="7" height="7"></rect>
+          <rect x="14" y="3" width="7" height="7"></rect>
+          <rect x="14" y="14" width="7" height="7"></rect>
+          <rect x="3" y="14" width="7" height="7"></rect>
+          <line x1="7" y1="7" x2="7.01" y2="7"></line>
+          <line x1="17" y1="7" x2="17.01" y2="7"></line>
+          <line x1="7" y1="17" x2="7.01" y2="17"></line>
+        </svg>
+      </div>
+      <div>
+        <div class="pe-app-name">PDF TEXT &amp; QR EDITOR</div>
+        <div class="pe-app-sub">100% Local · Zero Upload</div>
+      </div>
+    </div>
+
+    <div class="pe-topbar-sep"></div>
+
+    <div class="pe-status ready" id="peStatus">
+      <span class="pe-status-dot"></span>
+      <span id="peStatusText">READY</span>
+    </div>
+
+    <div class="pe-topbar-spacer"></div>
+
+    <!-- Open PDF button -->
+    <button class="pe-topbar-btn primary" id="peBtnOpenPdf">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+        <polyline points="17 8 12 3 7 8"></polyline>
+        <line x1="12" y1="3" x2="12" y2="15"></line>
+      </svg>
+      Open PDF
+    </button>
+
+    <!-- Download PDF -->
+    <button class="pe-topbar-btn" id="peBtnDownloadPdf" disabled title="Download modified PDF">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+        <polyline points="7 10 12 15 17 10"></polyline>
+        <line x1="12" y1="15" x2="12" y2="3"></line>
+      </svg>
+      Download PDF
+    </button>
+
+    <!-- Back to QR Studio -->
+    <button class="pe-topbar-btn" id="peBtnQrStudio" title="Open full QR Studio">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+        <polyline points="15 3 21 3 21 9"></polyline>
+        <line x1="10" y1="14" x2="21" y2="3"></line>
+      </svg>
+      QR Studio
+    </button>
+
+    <input type="file" id="pePdfFileInput" accept="application/pdf,.pdf" style="display:none">
+  </header>
+
+  <!-- ─── Toolbar ──────────────────────────────────────────────────────────── -->
+  <div class="pe-toolbar" id="peToolbar">
+
+    <!-- Tool buttons -->
+    <button class="pe-tool-btn active" id="peBtnSelect" title="Select & Move objects (S)">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="4 6 4 2 8 2"></polyline><line x1="4" y1="2" x2="13" y2="11"></line>
+        <path d="M10 11l2 11 3-7 4 2L10 11z"></path>
+      </svg>
+      Select
+    </button>
+
+    <button class="pe-tool-btn" id="peBtnTextTool" title="Select & edit existing text (T)">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="4 7 4 4 20 4 20 7"></polyline>
+        <line x1="9" y1="20" x2="15" y2="20"></line>
+        <line x1="12" y1="4" x2="12" y2="20"></line>
+      </svg>
+      Text
+    </button>
+
+    <button class="pe-tool-btn" id="peBtnAddText" title="Add new text (A)">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <line x1="12" y1="5" x2="12" y2="19"></line>
+        <line x1="5" y1="12" x2="19" y2="12"></line>
+      </svg>
+      Add Text
+    </button>
+
+    <button class="pe-tool-btn" id="peBtnQrTool" title="Detect & edit QR codes (Q)">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect>
+        <rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect>
+        <line x1="7" y1="7" x2="7.01" y2="7"></line><line x1="17" y1="7" x2="17.01" y2="7"></line>
+        <line x1="7" y1="17" x2="7.01" y2="17"></line>
+      </svg>
+      QR
+    </button>
+
+    <div class="pe-tool-sep"></div>
+
+    <!-- Undo / Redo -->
+    <button class="pe-tool-btn undo-btn" id="peBtnUndo" title="Undo (Ctrl+Z)" disabled>↩</button>
+    <button class="pe-tool-btn redo-btn" id="peBtnRedo" title="Redo (Ctrl+Y)" disabled>↪</button>
+
+    <div class="pe-tool-sep"></div>
+
+    <!-- Zoom controls -->
+    <div class="pe-zoom-group">
+      <button class="pe-zoom-btn" id="peBtnZoomOut" title="Zoom out (Ctrl+-)">−</button>
+      <span class="pe-zoom-label" id="peZoomLabel">100%</span>
+      <button class="pe-zoom-btn" id="peBtnZoomIn" title="Zoom in (Ctrl++)">+</button>
+    </div>
+
+    <button class="pe-tool-btn" id="peBtnFitWidth" title="Fit width">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path>
+      </svg>
+      Fit
+    </button>
+
+    <div class="pe-tool-sep"></div>
+
+    <!-- Word-Style Document Text Ribbon -->
+    <div class="pe-ribbon-group" id="peRibbonGroup">
+      <!-- Font Family -->
+      <select class="pe-ribbon-select" id="peRibbonFont" title="Font Family">
+        <option value="Helvetica">Arial / Helvetica</option>
+        <option value="Times New Roman">Times New Roman</option>
+        <option value="Courier New">Courier New</option>
+        <option value="Georgia">Georgia</option>
+        <option value="Verdana">Verdana</option>
+        <option value="Trebuchet MS">Trebuchet MS</option>
+      </select>
+
+      <!-- Font Size -->
+      <div class="pe-ribbon-size-wrap">
+        <button class="pe-ribbon-btn icon-only" id="peRibbonFontDown" title="Decrease font size">A−</button>
+        <input type="number" class="pe-ribbon-size-input" id="peRibbonFontSize" value="12" min="6" max="120" title="Font size (pt)">
+        <button class="pe-ribbon-btn icon-only" id="peRibbonFontUp" title="Increase font size">A+</button>
+      </div>
+
+      <!-- Bold / Italic -->
+      <button class="pe-ribbon-btn format-b" id="peRibbonBold" title="Bold (Ctrl+B)">B</button>
+      <button class="pe-ribbon-btn format-i" id="peRibbonItalic" title="Italic (Ctrl+I)">I</button>
+
+      <!-- Text Color Picker -->
+      <div class="pe-ribbon-color-wrap" title="Text Color">
+        <span class="pe-ribbon-color-letter">A</span>
+        <input type="color" class="pe-ribbon-color-input" id="peRibbonColor" value="#000000">
+        <span class="pe-ribbon-color-bar" id="peRibbonColorBar"></span>
+      </div>
+
+      <!-- Alignment -->
+      <div class="pe-ribbon-align-group">
+        <button class="pe-ribbon-btn align-btn active" id="peRibbonAlignLeft" title="Align Left">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="17" y1="10" x2="3" y2="10"></line><line x1="21" y1="6" x2="3" y2="6"></line>
+            <line x1="21" y1="14" x2="3" y2="14"></line><line x1="17" y1="18" x2="3" y2="18"></line>
+          </svg>
+        </button>
+        <button class="pe-ribbon-btn align-btn" id="peRibbonAlignCenter" title="Center">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="10" x2="6" y2="10"></line><line x1="21" y1="6" x2="3" y2="6"></line>
+            <line x1="18" y1="14" x2="6" y2="14"></line><line x1="21" y1="18" x2="3" y2="18"></line>
+          </svg>
+        </button>
+        <button class="pe-ribbon-btn align-btn" id="peRibbonAlignRight" title="Align Right">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="21" y1="10" x2="7" y2="10"></line><line x1="21" y1="6" x2="3" y2="6"></line>
+            <line x1="21" y1="14" x2="7" y2="14"></line><line x1="21" y1="18" x2="3" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Delete / Commit buttons -->
+      <button class="pe-ribbon-btn delete-btn" id="peRibbonDelete" title="Delete text">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="3 6 5 6 21 6"></polyline>
+          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+        </svg>
+      </button>
+      <button class="pe-ribbon-btn commit-btn" id="peRibbonDone" title="Finish Editing (Esc)">✓ Done</button>
+    </div>
+
+  </div>
+
+  <!-- ─── Body ─────────────────────────────────────────────────────────────── -->
+  <div class="pe-body">
+
+    <!-- Left: Thumbnail Panel -->
+    <div class="pe-thumb-panel" id="peThumbPanel">
+      <div class="pe-thumb-header">PAGES</div>
+      <div class="pe-thumb-list" id="peThumbList">
+        <!-- Populated by JS -->
+      </div>
+    </div>
+
+    <!-- Centre: Canvas Viewport -->
+    <div class="pe-viewport" id="peViewport">
+
+      <!-- Empty / upload state -->
+      <div class="pe-empty" id="peEmpty">
+        <div class="pe-empty-ring">
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="1.8">
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+            <circle cx="8.5" cy="8.5" r="1.5"></circle>
+            <polyline points="21 15 16 10 5 21"></polyline>
+          </svg>
+        </div>
+        <h2>Open a PDF to start editing</h2>
+        <p>View pages, edit text, add annotations, detect &amp; replace QR codes — all locally in your browser.</p>
+        <button class="pe-topbar-btn primary" id="peBtnEmptyOpen">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="17 8 12 3 7 8"></polyline>
+            <line x1="12" y1="3" x2="12" y2="15"></line>
+          </svg>
+          Choose PDF File
+        </button>
+        <span class="pe-security">🔒 100% local — your PDF never leaves this browser</span>
+      </div>
+
+      <!-- Scanned-page notice (shown over canvas) -->
+      <div class="pe-scanned-notice" id="peScannedNotice">
+        ⚠️ This page appears scanned — no extractable text. OCR editing can be added in a future version.
+      </div>
+
+      <!-- Canvas Stage (shown when PDF loaded) -->
+      <div class="pe-canvas-stage mode-select" id="peCanvasStage">
+        <div class="pe-canvas-wrap" id="peCanvasWrap">
+          <!-- Rendered PDF page -->
+          <canvas id="peMainCanvas"></canvas>
+          <!-- Synchronized DOM Interactive Text Layer (Section 5) -->
+          <div class="pe-text-layer" id="peTextLayer"></div>
+          <!-- Transparent edit overlay -->
+          <canvas id="peEditOverlay"></canvas>
+          <!-- Inline text editor -->
+          <textarea id="peTextInput" rows="1" spellcheck="false" autocomplete="off"></textarea>
+          <!-- Resize handle (shown for selected added-text objects) -->
+          <div class="pe-resize-handle" id="peResizeHandle" style="display:none;"></div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Right: Contextual Panel -->
+    <aside class="pe-ctx-panel" id="peCtxPanel">
+
+      <!-- Progress card (within context panel) -->
+      <div class="pe-progress-card" id="peProgressCard">
+        <div class="pe-progress-top">
+          <div class="pe-progress-label">
+            <span class="pe-progress-spinner"></span>
+            <span id="peProgressText">Processing...</span>
+          </div>
+          <span class="pe-progress-pct" id="peProgressPct">0%</span>
+        </div>
+        <div class="pe-progress-track">
+          <div class="pe-progress-fill" id="peProgressFill"></div>
+        </div>
+      </div>
+
+      <!-- Placeholder (nothing selected) -->
+      <div class="pe-ctx-placeholder" id="peCtxPlaceholder">
+        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="12" y1="8" x2="12" y2="12"></line>
+          <line x1="12" y1="16" x2="12.01" y2="16"></line>
+        </svg>
+        <p>Select a text or QR object<br>to edit its properties</p>
+      </div>
+
+      <!-- ─── Text Editing Section ──────────────────────────────────────── -->
+      <div class="pe-ctx-section" id="peCtxText">
+        <div class="pe-ctx-header">
+          <span class="pe-ctx-title">Text Properties</span>
+          <span class="pe-ctx-badge text">TEXT</span>
+        </div>
+        <div class="pe-ctx-body">
+
+          <!-- Content -->
+          <div class="pe-field-row">
+            <label class="pe-field-label">Content</label>
+            <textarea class="pe-field-textarea" id="peCtxContent" rows="3" spellcheck="false"></textarea>
+          </div>
+
+          <!-- Font family + size -->
+          <div class="pe-row-2">
+            <div class="pe-field-row">
+              <label class="pe-field-label">Font</label>
+              <select class="pe-field-select" id="peCtxFont">
+                <option value="Helvetica">Helvetica</option>
+                <option value="Arial">Arial</option>
+                <option value="Times New Roman">Times NR</option>
+                <option value="Courier New">Courier</option>
+                <option value="Georgia">Georgia</option>
+              </select>
+            </div>
+            <div class="pe-field-row">
+              <label class="pe-field-label">Size (pt)</label>
+              <input type="number" class="pe-field-input" id="peCtxFontSize" min="6" max="144" value="12">
+            </div>
+          </div>
+
+          <!-- Bold / Italic -->
+          <div class="pe-field-row">
+            <label class="pe-field-label">Style</label>
+            <div class="pe-format-bar">
+              <button class="pe-fmt-btn" id="peCtxBold" title="Bold (Ctrl+B)"><b>B</b></button>
+              <button class="pe-fmt-btn" id="peCtxItalic" title="Italic (Ctrl+I)"><i>I</i></button>
+            </div>
+          </div>
+
+          <!-- Alignment -->
+          <div class="pe-field-row">
+            <label class="pe-field-label">Alignment</label>
+            <div class="pe-format-bar">
+              <button class="pe-fmt-btn active" id="peCtxAlignLeft" title="Left">≡</button>
+              <button class="pe-fmt-btn" id="peCtxAlignCenter" title="Center">≡</button>
+              <button class="pe-fmt-btn" id="peCtxAlignRight" title="Right">≡</button>
+            </div>
+          </div>
+
+          <!-- Color -->
+          <div class="pe-field-row">
+            <label class="pe-field-label">Color</label>
+            <div class="pe-color-row">
+              <input type="color" class="pe-color-input" id="peCtxColor" value="#000000">
+              <input type="text" class="pe-color-hex" id="peCtxColorHex" value="#000000" maxlength="7">
+            </div>
+          </div>
+
+          <div class="pe-ctx-divider"></div>
+
+          <!-- Apply + Delete -->
+          <button class="pe-btn pe-btn-primary" id="peCtxApplyText">Apply Changes</button>
+          <button class="pe-btn pe-btn-danger pe-mt-4" id="peCtxDeleteText">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="3 6 5 6 21 6"></polyline>
+              <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path>
+              <path d="M10 11v6"></path><path d="M14 11v6"></path>
+              <path d="M9 6V4h6v2"></path>
+            </svg>
+            Delete Text
+          </button>
+
+        </div>
+      </div>
+
+      <!-- ─── QR Editing Section ────────────────────────────────────────── -->
+      <div class="pe-ctx-section" id="peCtxQr">
+        <div class="pe-ctx-header">
+          <span class="pe-ctx-title">QR Code</span>
+          <span class="pe-ctx-badge qr">QR</span>
+        </div>
+        <div class="pe-ctx-body">
+
+          <!-- Detected data -->
+          <div class="pe-field-row">
+            <label class="pe-field-label">Decoded Data</label>
+            <textarea class="pe-field-textarea" id="peCtxQrData" rows="3" readonly spellcheck="false"></textarea>
+          </div>
+
+          <div class="pe-small" id="peCtxQrType">Type: TEXT</div>
+
+          <!-- Edit section -->
+          <div class="pe-ctx-divider"></div>
+          <div class="pe-field-row">
+            <label class="pe-field-label">New QR Data</label>
+            <textarea class="pe-field-textarea" id="peCtxQrEdit" rows="3" spellcheck="false" placeholder="Enter new QR content..."></textarea>
+          </div>
+
+          <!-- Advanced -->
+          <details style="margin-top:4px;">
+            <summary style="font-size:11px;color:var(--text-dim);cursor:pointer;user-select:none;padding:2px 0">Advanced ▾</summary>
+            <div style="margin-top:8px;display:flex;flex-direction:column;gap:6px;">
+              <div class="pe-field-row">
+                <label class="pe-field-label">Error Correction</label>
+                <select class="pe-field-select" id="peCtxQrEC">
+                  <option value="L">L – 7%</option>
+                  <option value="M" selected>M – 15% (Standard)</option>
+                  <option value="Q">Q – 25%</option>
+                  <option value="H">H – 30%</option>
+                </select>
+              </div>
+            </div>
+          </details>
+
+          <button class="pe-btn pe-btn-primary" id="peCtxGenerateQr">Generate New QR</button>
+
+          <!-- Verification result -->
+          <div id="peCtxVerifyResult" style="display:none">
+            <div class="pe-verify-badge" id="peCtxVerifyBadge">
+              <span id="peCtxVerifyIcon">✓</span>
+              <span id="peCtxVerifyText">QR verified</span>
+            </div>
+
+            <div class="pe-qr-compare pe-mt-4">
+              <div class="pe-qr-compare-box">
+                <div class="pe-qr-compare-label">ORIGINAL</div>
+                <div class="pe-qr-compare-frame" id="peOldQrFrame"></div>
+              </div>
+              <div class="pe-qr-compare-box">
+                <div class="pe-qr-compare-label">NEW</div>
+                <div class="pe-qr-compare-frame" id="peNewQrFrame"></div>
+              </div>
+            </div>
+
+            <button class="pe-btn pe-btn-success pe-mt-4" id="peCtxApplyQr" disabled>Apply QR Replacement</button>
+            <button class="pe-btn pe-btn-secondary pe-mt-4" id="peCtxCancelQr">Cancel</button>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- ─── Export / Success Section ──────────────────────────────────── -->
+      <div class="pe-ctx-section" id="peCtxExport">
+        <div class="pe-ctx-header">
+          <span class="pe-ctx-title">Export</span>
+          <span class="pe-ctx-badge" style="background:rgba(16,185,129,0.2);color:var(--emerald);">READY</span>
+        </div>
+        <div class="pe-ctx-body">
+          <div class="pe-success-callout">
+            <div class="pe-success-icon">✓</div>
+            <div>
+              <div class="pe-success-title">Changes Applied</div>
+              <div class="pe-success-desc" id="peExportDesc">Ready to export the modified PDF.</div>
+            </div>
+          </div>
+          <button class="pe-btn pe-btn-primary pe-mt-8" id="peCtxDownload">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="7 10 12 15 17 10"></polyline>
+              <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+            Download Modified PDF
+          </button>
+          <button class="pe-btn pe-btn-secondary pe-mt-4" id="peCtxContinueEditing">Continue Editing</button>
+        </div>
+      </div>
+
+    </aside>
+  </div>
+
+  <!-- ─── Bottom Bar ────────────────────────────────────────────────────────── -->
+  <div class="pe-bottombar" id="peBottomBar">
+
+    <!-- Page navigation -->
+    <div class="pe-page-nav">
+      <button class="pe-page-nav-btn" id="peBtnPrev" title="Previous page" disabled>‹</button>
+      <div class="pe-page-input-wrap">
+        Page
+        <input type="number" class="pe-page-input" id="pePageInput" value="1" min="1">
+        <span id="peTotalPages">of 1</span>
+      </div>
+      <button class="pe-page-nav-btn" id="peBtnNext" title="Next page" disabled>›</button>
+    </div>
+
+    <div class="pe-bottombar-spacer"></div>
+
+    <!-- Fit width + 100% -->
+    <button class="pe-zoom-fit-btn" id="peBtnFitWidthBottom">Fit Width</button>
+    <button class="pe-zoom-fit-btn" id="peBtnZoom100">100%</button>
+
+    <!-- Download shortcut -->
+    <button class="pe-topbar-btn primary" id="peBtnDownloadBottom" disabled>Download PDF</button>
+  </div>
+
+  <!-- ─── Error Banner ──────────────────────────────────────────────────────── -->
+  <div class="pe-error-banner" id="peErrorBanner">
+    <span class="pe-error-banner-text" id="peErrorText">Error message</span>
+    <button class="pe-error-dismiss" id="peBtnDismissError">&times;</button>
+  </div>
+
+</div><!-- /.pe-shell -->
+
+<!-- ─── Scripts ──────────────────────────────────────────────────────────────── -->
+<!-- Existing bundled libraries (untouched) -->
+<script src="lib/jsQR.js"></script>
+<script src="lib/qrcode.js"></script>
+<script src="lib/pdf.min.js"></script>
+<script src="lib/pdf-lib.min.js"></script>
+
+<!-- Existing scanner modules (untouched) -->
+<script src="scanner/qr-scanner.js"></script>
+<script src="scanner/qr-generator.js"></script>
+<script src="scanner/pdf-processor.js"></script>
+
+<!-- New text editor engine -->
+<script src="scanner/text-editor-engine.js"></script>
+
+<!-- PDF editor controller -->
+<script src="pdf-editor.js"></script>
+</body>
+</html>

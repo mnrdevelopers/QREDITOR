@@ -49,6 +49,7 @@
   const btnScan = document.getElementById('btnScan');
   const btnClear = document.getElementById('btnClear');
   const btnOpenEditorTab = document.getElementById('btnOpenEditorTab');
+  const btnOpenPdfEditor = document.getElementById('btnOpenPdfEditor');
 
   // Result Card
   const resultCard = document.getElementById('resultCard');
@@ -197,6 +198,48 @@
       handleFile(dt.files[0]);
     }
   });
+
+  // Open Full Studio (QR editor) in a new tab
+  if (btnOpenEditorTab) {
+    btnOpenEditorTab.addEventListener('click', () => {
+      if (typeof chrome !== 'undefined' && chrome.tabs && chrome.tabs.create) {
+        chrome.tabs.create({ url: chrome.runtime.getURL('editor.html') });
+      } else {
+        window.open('editor.html', '_blank');
+      }
+    });
+  }
+
+  // Open PDF Text & QR Editor in a new tab
+  // Optionally hands off the currently loaded PDF bytes
+  if (btnOpenPdfEditor) {
+    btnOpenPdfEditor.addEventListener('click', async () => {
+      if (isPdfMode && currentFile && typeof chrome !== 'undefined' && chrome.storage) {
+        try {
+          const ab = await currentFile.arrayBuffer();
+          const uint8 = new Uint8Array(ab);
+          // Convert to base64 in chunks to avoid stack overflow on large files
+          let binary = '';
+          const chunkSize = 8192;
+          for (let i = 0; i < uint8.length; i += chunkSize) {
+            binary += String.fromCharCode(...uint8.subarray(i, i + chunkSize));
+          }
+          const b64 = btoa(binary);
+          chrome.storage.local.set({
+            pdfEditorHandoff: { data: b64, name: currentFile.name }
+          }, () => {
+            chrome.tabs.create({ url: chrome.runtime.getURL('pdf-editor.html') });
+          });
+          return;
+        } catch (_) { /* fall through to plain open */ }
+      }
+      if (typeof chrome !== 'undefined' && chrome.tabs && chrome.tabs.create) {
+        chrome.tabs.create({ url: chrome.runtime.getURL('pdf-editor.html') });
+      } else {
+        window.open('pdf-editor.html', '_blank');
+      }
+    });
+  }
 
   function handleFile(file) {
     hideError();
